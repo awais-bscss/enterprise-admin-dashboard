@@ -1,9 +1,9 @@
 {
   "name": "enterprise-admin-dashboard",
   "private": true,
-  "workspaces": ["apps/*"],
   "scripts": {
-    "dev:web": "npm run dev -w apps/web",
-    "build:web": "npm run build -w apps/web"
+    "install:web": "npm install --prefix apps/web",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build:web": "npm --prefix apps/web run build"
   }
 }

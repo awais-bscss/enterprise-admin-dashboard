@@ -16,7 +16,7 @@ Production-focused Enterprise Administration Dashboard built with a **React + Ty
 ├── exercises/              # Standalone technical exercises (isolated from the main app)
 ├── .github/
 │   └── pull_request_template.md
-└── package.json            # Root npm workspace configuration
+└── package.json            # Root convenience scripts
 ```
 
 ## Planned Architecture
@@ -39,13 +39,13 @@ Production-focused Enterprise Administration Dashboard built with a **React + Ty
 - npm (10+)
 - MongoDB instance (required once `apps/api` is configured)
 
-### Workspace Scripts
+### Root Scripts
 
-From the repository root:
+Each application (`apps/web`, `apps/api`) maintains its own independent `package.json` and `package-lock.json`. From the repository root:
 
 ```bash
-# Install workspace dependencies
-npm install
+# Install web dependencies
+npm run install:web
 
 # Start the web application in development mode
 npm run dev:web
