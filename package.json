@@ -1,5 +1,5 @@
 {
-  "name": "month-4",
+  "name": "enterprise-admin-dashboard",
   "private": true,
   "workspaces": ["apps/*"],
   "scripts": {
