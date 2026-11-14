@@ -3,7 +3,11 @@
   "private": true,
   "scripts": {
     "install:web": "npm install --prefix apps/web",
+    "install:api": "npm install --prefix apps/api",
     "dev:web": "npm --prefix apps/web run dev",
-    "build:web": "npm --prefix apps/web run build"
+    "dev:api": "npm --prefix apps/api run dev",
+    "build:web": "npm --prefix apps/web run build",
+    "compile:api": "npm --prefix apps/api run compile",
+    "typecheck:api": "npm --prefix apps/api run typecheck"
   }
 }
