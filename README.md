@@ -28,7 +28,7 @@ Production-focused Enterprise Administration Dashboard built with a **React + Ty
 ## Tech Stack
 
 - **Frontend (`apps/web`):** React 19, TypeScript, Vite, Oxlint
-- **Backend (`apps/api`):** Node.js, Express, MongoDB *(setup pending)*
+- **Backend (`apps/api`):** Node.js, Express 5, TypeScript, MongoDB (Mongoose)
 - **Testing & Audits:** Vitest, React Testing Library, Playwright, Lighthouse *(setup pending)*
 
 ## Getting Started
@@ -37,24 +37,29 @@ Production-focused Enterprise Administration Dashboard built with a **React + Ty
 
 - Node.js (LTS 20+ recommended)
 - npm (10+)
-- MongoDB instance (required once `apps/api` is configured)
+- MongoDB Atlas or local MongoDB connection string
 
 ### Root Scripts
 
 Each application (`apps/web`, `apps/api`) maintains its own independent `package.json` and `package-lock.json`. From the repository root:
 
 ```bash
-# Install web dependencies
+# Install dependencies
 npm run install:web
+npm run install:api
 
-# Start the web application in development mode
+# Start development servers
+npm run dev:api
 npm run dev:web
 
-# Build the web application for production
+# Typecheck, lint, and build
+npm run typecheck:api
+npm run compile:api
+npm run lint:web
 npm run build:web
 ```
 
-> **Environment Variables:** Environment configuration templates (`.env.example`) and full setup steps for `apps/api` and `apps/web` will be documented as modules are implemented. Never commit real `.env` files or secrets.
+> **Environment Variables:** Copy `apps/api/.env.example` to `apps/api/.env` (and optionally `apps/web/.env.example` to `apps/web/.env`) for local development. Never commit real `.env` files or secrets.
 
 ## Documentation & Reports
 
