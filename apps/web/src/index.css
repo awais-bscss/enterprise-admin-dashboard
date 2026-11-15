@@ -1,1 +1,61 @@
 @import "tailwindcss";
+
+:root {
+  --surface-canvas: #f5f7fa;
+  --surface-card: #ffffff;
+  --surface-subtle: #f8fafc;
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+  --border-card: rgba(226, 232, 240, 0.7);
+  --border-modal: rgba(226, 232, 240, 0.8);
+
+  --radius-card: 1.5rem;
+  --radius-panel: 1.375rem;
+  --radius-modal: 1.625rem;
+  --radius-nav: 0.5rem;
+
+  --shadow-bento: 0 6px 28px -8px rgba(15, 23, 42, 0.06), 0 1px 3px 0 rgba(15, 23, 42, 0.03);
+  --shadow-sidebar: 4px 0 24px -14px rgba(15, 23, 42, 0.07);
+}
+
+@theme {
+  --color-canvas: var(--surface-canvas);
+  --color-surface: var(--surface-card);
+  --color-surface-subtle: var(--surface-subtle);
+  --radius-bento: var(--radius-card);
+  --radius-panel: var(--radius-panel);
+  --radius-modal: var(--radius-modal);
+  --shadow-bento: var(--shadow-bento);
+  --shadow-sidebar: var(--shadow-sidebar);
+}
+
+@layer base {
+  body {
+    background-color: var(--surface-canvas);
+    color: var(--text-primary);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.bento-shadow {
+  box-shadow: var(--shadow-bento);
+}
+
+.bento-card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-bento);
+}
+
+.bento-modal {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-modal);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-bento);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

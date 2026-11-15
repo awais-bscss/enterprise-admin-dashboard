@@ -10,6 +10,11 @@ export interface AuthContextValue {
   expiresAt: number | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (payload: {
+    name?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => Promise<void>;
   clearSessionNotice: () => void;
   hasRole: (...roles: Role[]) => boolean;
   hasPermission: (permission: Permission) => boolean;

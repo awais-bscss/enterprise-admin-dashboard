@@ -1,195 +1,318 @@
-import { useEffect, useState } from 'react';
-import { ApiError, apiRequest } from '../../lib/api';
-import type { ApiSuccessResponse } from '../../types/api';
-import type { DashboardOverviewData, Permission } from '../../types/auth';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  ArrowRight,
+  CheckSquare,
+  FolderKanban,
+  Lock,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Users,
+} from 'lucide-react';
+import { DashboardLayout } from '../../components/layout/DashboardLayout';
+import { BADGE_TOKENS, BUTTON_TOKENS } from '../../theme/tokens';
 import { useAuth } from '../auth/authContext';
 import { PermissionGate } from '../auth/PermissionGate';
+import { UserFormModal } from '../directory/UserFormModal';
 import { HealthStatusCard } from '../health/HealthStatusCard';
-
-interface ModuleCardConfig {
-  permission: Permission;
-  title: string;
-  grantedText: string;
-  deniedText: string;
-}
-
-const RBAC_MODULES: readonly ModuleCardConfig[] = [
-  {
-    permission: 'users:write',
-    title: 'User Administration',
-    grantedText: 'Full access to invite, update roles, and suspend accounts.',
-    deniedText: 'Requires users:write permission (Admin only).',
-  },
-  {
-    permission: 'audit:read',
-    title: 'Security Audit Logs',
-    grantedText: 'Access granted to inspect active sessions and activity trails.',
-    deniedText: 'Requires audit:read permission (Admin or Manager).',
-  },
-  {
-    permission: 'reports:export',
-    title: 'Compliance Exports',
-    grantedText: 'Access granted to generate and download operational reports.',
-    deniedText: 'Requires reports:export permission (Admin or Manager).',
-  },
-  {
-    permission: 'settings:manage',
-    title: 'System Security Settings',
-    grantedText: 'Access granted to configure organization-wide policies.',
-    deniedText: 'Requires settings:manage permission (Admin only).',
-  },
-];
+import { ProjectFormModal } from '../projects/ProjectFormModal';
+import { AccessCoverageChartCard } from './components/AccessCoverageChartCard';
+import { AuthActivityTrendCard } from './components/AuthActivityTrendCard';
+import { DirectoryStatusDonutCard } from './components/DirectoryStatusDonutCard';
+import { StatBentoCard } from './components/StatBentoCard';
+import { useDashboardOverview } from './useDashboardOverview';
 
 export function DashboardPage() {
-  const { user, logout, expiresAt } = useAuth();
-  const [overview, setOverview] = useState<DashboardOverviewData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    apiRequest<ApiSuccessResponse<DashboardOverviewData>>('/dashboard/overview', {
-      signal: controller.signal,
-    })
-      .then((res) => {
-        setOverview(res.data);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        setError(err instanceof ApiError ? err.message : 'Unable to load overview');
-      });
-
-    return () => controller.abort();
-  }, []);
-
-  async function handleLogout() {
-    setSigningOut(true);
-    try {
-      await logout();
-    } finally {
-      setSigningOut(false);
-    }
-  }
+  const { user } = useAuth();
+  const {
+    overview,
+    refreshing,
+    error,
+    searchQuery,
+    setSearchQuery,
+    filteredModules,
+    metrics: { totalProjects, activeProjects, totalTasks, completedTasks, totalUsers, taskRate },
+    handleRefresh,
+  } = useDashboardOverview();
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [userModalOpen, setUserModalOpen] = useState(false);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
-      <div className="mx-auto max-w-5xl space-y-5">
-        <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+    <DashboardLayout searchQuery={searchQuery} onSearchChange={setSearchQuery}>
+      <div className="space-y-6">
+        {/* Overview Title Row */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-bold tracking-wider text-blue-700 uppercase">
-              Enterprise Administration
-            </p>
-            <h1 className="mt-1 text-2xl font-bold text-slate-900">Welcome, {user?.name}</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              {user?.email} &middot; Role:{' '}
-              <span className="font-semibold text-slate-900 uppercase">{user?.role}</span>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">
+              Project &amp; Administration Overview
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Welcome back, <span className="font-semibold text-slate-700">{user?.name}</span> &middot;
+              Live project metrics, team capacity, and RBAC governance
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {expiresAt ? (
-              <span className="text-xs text-slate-500">
-                Token refresh before {new Date(expiresAt).toLocaleTimeString()}
-              </span>
-            ) : null}
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={() => void handleLogout()}
-              disabled={signingOut}
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
+              className={`${BUTTON_TOKENS.secondaryPill} py-2.5`}
             >
-              {signingOut ? 'Signing out...' : 'Sign out'}
+              <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
             </button>
+
+            <PermissionGate permission="projects:write">
+              <button
+                type="button"
+                onClick={() => setCreateModalOpen(true)}
+                className={`${BUTTON_TOKENS.primarySoftPill} py-2.5`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New Project
+              </button>
+            </PermissionGate>
           </div>
-        </header>
+        </div>
 
         {error ? (
-          <div
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
+          <div className={BUTTON_TOKENS.alertError} role="alert">
             {error}
           </div>
         ) : null}
 
+        {/* Top 3 KPI Bento Cards */}
         <section
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs"
-          aria-labelledby="overview-heading"
+          className="grid grid-cols-1 gap-5 md:grid-cols-3"
+          aria-label="Workspace key metrics"
         >
-          <h2 id="overview-heading" className="text-base font-semibold text-slate-900">
-            Workspace Overview
-          </h2>
-
-          <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 p-3.5">
-              <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-                Total Users
-              </dt>
-              <dd className="mt-1 text-2xl font-bold text-slate-900">
-                {overview ? overview.stats.totalUsers : '...'}
-              </dd>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-3.5">
-              <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-                Active Users
-              </dt>
-              <dd className="mt-1 text-2xl font-bold text-slate-900">
-                {overview ? overview.stats.activeUsers : '...'}
-              </dd>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-3.5">
-              <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-                Active Sessions
-              </dt>
-              <dd className="mt-1 text-2xl font-bold text-slate-900">
-                {overview
-                  ? overview.stats.activeSessions === null
-                    ? 'Restricted'
-                    : overview.stats.activeSessions
-                  : '...'}
-              </dd>
-            </div>
-          </dl>
-
-          <div className="mt-4 flex flex-wrap gap-2" aria-label="Assigned permissions">
-            {user?.permissions.map((perm) => (
-              <span
-                key={perm}
-                className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-800"
-              >
-                {perm}
+          <StatBentoCard
+            title="Active Projects"
+            value={overview ? activeProjects : '...'}
+            delta={`${totalProjects} total`}
+            footerLabel="Live project tracker"
+            to="/projects"
+            tone="mint"
+            icon={FolderKanban}
+            rightSlot={
+              <span className="rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
+                Workspace
               </span>
+            }
+          />
+
+          <StatBentoCard
+            title="Total Tasks"
+            value={overview ? totalTasks : '...'}
+            delta={`${taskRate}% done`}
+            footerLabel={`${completedTasks} completed tasks`}
+            to="/projects"
+            tone="sky"
+            icon={CheckSquare}
+            rightSlot={
+              <span className="rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
+                Milestones
+              </span>
+            }
+          />
+
+          <StatBentoCard
+            title="Team Members"
+            value={overview ? totalUsers : '...'}
+            delta={
+              overview
+                ? overview.stats.activeSessions === null
+                  ? 'Directory'
+                  : `${overview.stats.activeSessions} sessions`
+                : undefined
+            }
+            footerLabel="Manage Users"
+            to="/users"
+            tone="rose"
+            icon={Users}
+            rightSlot={
+              <div className="flex items-center -space-x-2">
+                {(overview?.directoryPreview ?? []).slice(0, 3).map((member, idx) => (
+                  <span
+                    key={member.id}
+                    title={`${member.name} (${member.role})`}
+                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ring-2 ring-white ${
+                      BADGE_TOKENS.avatarTones[idx % BADGE_TOKENS.avatarTones.length]
+                    }`}
+                  >
+                    {member.name.slice(0, 2).toUpperCase()}
+                  </span>
+                ))}
+                <PermissionGate
+                  permission="users:write"
+                  fallback={
+                    <Link
+                      to="/users"
+                      aria-label="View users"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 ring-2 ring-white hover:bg-sky-50 hover:text-sky-700"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Link>
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => setUserModalOpen(true)}
+                    aria-label="Add user"
+                    title="Add user"
+                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 ring-2 ring-white hover:bg-sky-50 hover:text-sky-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </PermissionGate>
+              </div>
+            }
+          />
+        </section>
+
+        {/* Bottom 3 Interactive Recharts Bento Cards */}
+        <section
+          className="grid grid-cols-1 gap-5 lg:grid-cols-3"
+          aria-label="Live project and activity charts"
+        >
+          <AccessCoverageChartCard
+            averageProgress={overview?.stats.averageProgress ?? 0}
+            totalProjects={totalProjects}
+            categoryProgress={overview?.categoryProgress ?? []}
+          />
+
+          <DirectoryStatusDonutCard
+            totalProjects={totalProjects}
+            projectStatusBreakdown={overview?.projectStatusBreakdown ?? []}
+          />
+
+          <AuthActivityTrendCard activityTrend={overview?.activityTrend ?? []} />
+        </section>
+
+        {/* Recent Projects Quick List */}
+        {overview && overview.recentProjects.length > 0 ? (
+          <section
+            className="bento-shadow rounded-[24px] border border-slate-200/70 bg-white p-5"
+            aria-label="Recent projects"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
+              <h2 className="text-base font-semibold text-slate-900">Recent Projects</h2>
+              <Link
+                to="/projects"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 hover:text-sky-900"
+              >
+                Open Projects Workspace
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-4">
+              {overview.recentProjects.map((project) => (
+                <Link
+                  key={project.id}
+                  to="/projects"
+                  className="rounded-2xl border border-slate-100 bg-slate-50/75 p-3.5 transition hover:border-sky-200 hover:bg-white"
+                >
+                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                    <span className="font-semibold text-sky-700 capitalize">{project.category}</span>
+                    <span className="tabular-nums font-bold text-slate-700">
+                      {project.progress}%
+                    </span>
+                  </div>
+                  <p className="mt-1.5 truncate text-sm font-semibold text-slate-900">
+                    {project.name}
+                  </p>
+                  <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70">
+                    <div
+                      className={`h-full rounded-full ${
+                        project.status === 'completed' ? 'bg-emerald-300' : 'bg-sky-300'
+                      }`}
+                      style={{ width: `${project.progress}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-400">
+                    {project.tasksCompleted}/{project.tasksTotal} tasks &middot; {project.ownerName}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {/* RBAC Module Access Strip */}
+        <section aria-label="Role-based module access" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <Sparkles className="h-4 w-4 text-sky-600" />
+              Role-Based Module Access
+            </h2>
+            <div className="flex flex-wrap gap-1.5" aria-label="Assigned permissions">
+              {user?.permissions.map((perm) => (
+                <span
+                  key={perm}
+                  className="rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-200/70"
+                >
+                  {perm}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {filteredModules.map((mod) => (
+              <PermissionGate
+                key={mod.permission}
+                permission={mod.permission}
+                fallback={
+                  <article className="rounded-[20px] border border-dashed border-slate-200 bg-white/60 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-slate-500">{mod.title}</h3>
+                      <Lock className="h-3.5 w-3.5 text-slate-400" />
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-400">{mod.deniedText}</p>
+                  </article>
+                }
+              >
+                <Link
+                  to={mod.to}
+                  className="bento-shadow block rounded-[20px] border border-slate-200/70 bg-white p-4 transition hover:border-sky-200 hover:bg-sky-50/20"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-slate-900">{mod.title}</h3>
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  </div>
+                  <p className="mt-1.5 text-xs text-slate-500">{mod.grantedText}</p>
+                </Link>
+              </PermissionGate>
             ))}
           </div>
         </section>
 
-        <section
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-          aria-label="Role-based module access"
-        >
-          {RBAC_MODULES.map((mod) => (
-            <PermissionGate
-              key={mod.permission}
-              permission={mod.permission}
-              fallback={
-                <article className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                  <h3 className="text-sm font-semibold text-slate-700">{mod.title}</h3>
-                  <p className="mt-1 text-xs text-slate-500">{mod.deniedText}</p>
-                </article>
-              }
-            >
-              <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-                <h3 className="text-sm font-semibold text-slate-900">{mod.title}</h3>
-                <p className="mt-1 text-xs text-slate-600">{mod.grantedText}</p>
-              </article>
-            </PermissionGate>
-          ))}
-        </section>
-
         <HealthStatusCard />
       </div>
-    </main>
+
+      {createModalOpen ? (
+        <ProjectFormModal
+          onClose={() => setCreateModalOpen(false)}
+          onSaved={() => {
+            setCreateModalOpen(false);
+            void handleRefresh();
+          }}
+        />
+      ) : null}
+
+      {userModalOpen ? (
+        <UserFormModal
+          currentUserId={user?.id}
+          onClose={() => setUserModalOpen(false)}
+          onSaved={() => {
+            setUserModalOpen(false);
+            void handleRefresh();
+          }}
+        />
+      ) : null}
+    </DashboardLayout>
   );
 }

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { AlertTriangle, RotateCw } from 'lucide-react';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -32,18 +33,22 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
 
     return (
-      <main className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
+      <main className="flex min-h-screen items-center justify-center bg-[#f5f7fa] px-4 py-12 text-slate-900">
         <section
-          className="mx-auto max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xs"
+          className="bento-shadow w-full max-w-lg rounded-[28px] border border-slate-200/75 bg-white p-7"
           role="alert"
         >
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="mt-2 text-sm text-slate-600">{this.state.message}</p>
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 ring-1 ring-rose-100">
+            <AlertTriangle className="h-6 w-6" />
+          </div>
+          <h1 className="mt-4 text-xl font-bold tracking-tight">Something went wrong</h1>
+          <p className="mt-2 text-sm text-slate-500">{this.state.message}</p>
           <button
             type="button"
-            className="mt-4 inline-flex cursor-pointer items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+            className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-full border border-sky-200/90 bg-sky-100/90 px-5 py-2.5 text-sm font-semibold text-sky-900 transition hover:bg-sky-200/80"
             onClick={() => window.location.reload()}
           >
+            <RotateCw className="h-4 w-4" />
             Reload Page
           </button>
         </section>

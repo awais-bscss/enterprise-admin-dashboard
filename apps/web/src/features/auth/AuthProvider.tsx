@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { setAccessToken, setSessionExpiredHandler } from '../../lib/api';
 import { getCookie } from '../../lib/cookies';
 import type { AuthSessionData, AuthUser, Permission, Role } from '../../types/auth';
-import { loginRequest, logoutRequest, refreshSessionRequest } from './authApi';
+import {
+  loginRequest,
+  logoutRequest,
+  refreshSessionRequest,
+  updateProfileRequest,
+} from './authApi';
 import { AuthContext, type AuthStatus } from './authContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -97,6 +102,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearSession]);
 
+  const updateProfile = useCallback(
+    async (payload: { name?: string; currentPassword?: string; newPassword?: string }) => {
+      const updatedUser = await updateProfileRequest(payload);
+      setUser(updatedUser);
+    },
+    [],
+  );
+
   const clearSessionNotice = useCallback(() => {
     setSessionNotice(null);
   }, []);
@@ -120,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         expiresAt,
         login,
         logout,
+        updateProfile,
         clearSessionNotice,
         hasRole,
         hasPermission,

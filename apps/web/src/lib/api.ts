@@ -44,11 +44,23 @@ function buildUrl(path: string): string {
 
 async function parseError(response: Response): Promise<ApiError> {
   const payload = (await response.json().catch(() => null)) as ApiErrorResponse | null;
-  return new ApiError(
-    payload?.error?.message ?? `Request failed (${response.status})`,
-    response.status,
-    payload?.error?.code ?? 'REQUEST_FAILED',
-  );
+  if (payload?.error?.message) {
+    return new ApiError(
+      payload.error.message,
+      response.status,
+      payload.error.code ?? 'REQUEST_FAILED',
+    );
+  }
+
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    return new ApiError(
+      `API server unreachable (${response.status}). Make sure the backend server is running.`,
+      response.status,
+      'SERVICE_UNAVAILABLE',
+    );
+  }
+
+  return new ApiError(`Request failed (${response.status})`, response.status, 'REQUEST_FAILED');
 }
 
 // Coalesce concurrent refresh calls so rotated refresh tokens are never replayed.
