@@ -5,6 +5,9 @@ import { z } from "zod";
 import { getPermissionsForRole, type Role } from "../config/rbac.js";
 import { RefreshToken } from "../models/RefreshToken.js";
 import { User } from "../models/User.js";
+import { recordAuditEvent } from "../utils/audit.js";
+import { sendApiError } from "../utils/httpErrors.js";
+import { validateWorkspacePassword } from "../utils/passwordPolicy.js";
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_COOKIE_NAME,
@@ -94,6 +97,19 @@ export async function login(req: Request, res: Response): Promise<void> {
   const accessToken = signAccessToken({
     sub: String(user._id),
     role: user.role as Role,
+  });
+
+  await recordAuditEvent({
+    actor: {
+      userId: String(user._id),
+      name: user.name,
+      email: user.email,
+      role: user.role as Role,
+    },
+    action: "auth.login",
+    resourceType: "auth",
+    resourceId: String(user._id),
+    summary: `Signed in as ${user.role}`,
   });
 
   res.status(200).json({
@@ -188,6 +204,19 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     role: user.role as Role,
   });
 
+  await recordAuditEvent({
+    actor: {
+      userId: String(user._id),
+      name: user.name,
+      email: user.email,
+      role: user.role as Role,
+    },
+    action: "auth.login",
+    resourceType: "auth",
+    resourceId: String(user._id),
+    summary: `Signed in as ${user.role}`,
+  });
+
   res.status(200).json({
     ok: true,
     data: {
@@ -227,6 +256,75 @@ export function me(req: Request, res: Response): void {
         role: auth.role,
         permissions: auth.permissions,
       },
+    },
+  });
+}
+
+const updateProfileSchema = z
+  .object({
+    name: z.string().trim().min(2, "Name must be at least 2 characters").max(80).optional(),
+    currentPassword: z.string().min(6).optional(),
+    newPassword: z.string().min(6, "New password must be at least 6 characters").max(128).optional(),
+  })
+  .refine((data) => !(data.newPassword && !data.currentPassword), {
+    message: "Current password is required to set a new password",
+  });
+
+export async function updateProfile(req: Request, res: Response): Promise<void> {
+  const parsed = updateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendApiError(
+      res,
+      400,
+      "VALIDATION_ERROR",
+      parsed.error.issues[0]?.message ?? "Invalid profile update",
+    );
+    return;
+  }
+
+  const user = await User.findById(req.auth!.userId).select("+passwordHash");
+  if (!user || user.status !== "active") {
+    sendApiError(res, 401, "UNAUTHORIZED", "Account is inactive or missing");
+    return;
+  }
+
+  if (parsed.data.newPassword) {
+    const matches = await bcrypt.compare(parsed.data.currentPassword ?? "", user.passwordHash);
+    if (!matches) {
+      sendApiError(res, 400, "INVALID_PASSWORD", "Current password is incorrect");
+      return;
+    }
+    const passwordError = await validateWorkspacePassword(parsed.data.newPassword);
+    if (passwordError) {
+      sendApiError(res, 400, "VALIDATION_ERROR", passwordError);
+      return;
+    }
+    user.passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
+  }
+
+  if (parsed.data.name) {
+    user.name = parsed.data.name;
+  }
+
+  await user.save();
+
+  await recordAuditEvent({
+    actor: {
+      userId: String(user._id),
+      name: user.name,
+      email: user.email,
+      role: user.role as Role,
+    },
+    action: "auth.profile_updated",
+    resourceType: "auth",
+    resourceId: String(user._id),
+    summary: parsed.data.newPassword ? "Updated profile and password" : "Updated display name",
+  });
+
+  res.status(200).json({
+    ok: true,
+    data: {
+      user: serializeUser(user),
     },
   });
 }

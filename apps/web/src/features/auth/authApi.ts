@@ -34,3 +34,15 @@ export async function fetchCurrentUser(): Promise<AuthUser> {
   const res = await apiRequest<ApiSuccessResponse<{ user: AuthUser }>>('/auth/me');
   return res.data.user;
 }
+
+export async function updateProfileRequest(payload: {
+  name?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}): Promise<AuthUser> {
+  const res = await apiRequest<ApiSuccessResponse<{ user: AuthUser }>>('/auth/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return res.data.user;
+}

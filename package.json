@@ -2,6 +2,7 @@
   "name": "enterprise-admin-dashboard",
   "private": true,
   "scripts": {
+    "dev": "node scripts/dev.mjs",
     "install:web": "npm install --prefix apps/web",
     "install:api": "npm install --prefix apps/api",
     "dev:web": "npm --prefix apps/web run dev",
