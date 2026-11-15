@@ -1,14 +1,10 @@
 import type { CorsOptions } from "cors";
 import { env } from "./env.js";
 
-const DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
+const LOCAL_DEV_ORIGIN_RE = /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/;
 
-function getAllowedOrigins(): Set<string> {
+function getConfiguredOrigins(): Set<string> {
   const origins = new Set<string>();
-
-  if (env.NODE_ENV !== "production") {
-    DEV_ORIGINS.forEach((origin) => origins.add(origin));
-  }
 
   if (env.FRONTEND_URL) {
     env.FRONTEND_URL.split(",")
@@ -20,10 +16,13 @@ function getAllowedOrigins(): Set<string> {
   return origins;
 }
 
-const allowedOrigins = getAllowedOrigins();
+const configuredOrigins = getConfiguredOrigins();
 
 export function isAllowedOrigin(origin: string): boolean {
-  return allowedOrigins.has(origin);
+  if (env.NODE_ENV !== "production" && LOCAL_DEV_ORIGIN_RE.test(origin)) {
+    return true;
+  }
+  return configuredOrigins.has(origin);
 }
 
 export const corsOptions: CorsOptions = {
