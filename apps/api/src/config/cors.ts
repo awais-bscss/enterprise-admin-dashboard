@@ -12,7 +12,7 @@ function getAllowedOrigins(): Set<string> {
 
   if (env.FRONTEND_URL) {
     env.FRONTEND_URL.split(",")
-      .map((item) => item.trim())
+      .map((item) => item.trim().replace(/\/+$/, ""))
       .filter(Boolean)
       .forEach((origin) => origins.add(origin));
   }
@@ -22,9 +22,13 @@ function getAllowedOrigins(): Set<string> {
 
 const allowedOrigins = getAllowedOrigins();
 
+export function isAllowedOrigin(origin: string): boolean {
+  return allowedOrigins.has(origin);
+}
+
 export const corsOptions: CorsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) {
+    if (!origin || isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }

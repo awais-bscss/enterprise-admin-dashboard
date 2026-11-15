@@ -9,6 +9,7 @@
     "build:web": "npm --prefix apps/web run build",
     "lint:web": "npm --prefix apps/web run lint",
     "compile:api": "npm --prefix apps/api run compile",
-    "typecheck:api": "npm --prefix apps/api run typecheck"
+    "typecheck:api": "npm --prefix apps/api run typecheck",
+    "seed:api": "npm --prefix apps/api run seed"
   }
 }

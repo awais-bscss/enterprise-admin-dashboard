@@ -2,11 +2,6 @@ import { useEffect, useState } from 'react';
 import { ApiError, apiRequest } from '../../lib/api';
 import type { HealthResponse } from '../../types/api';
 
-function fetchHealthStatus(withCookieProbe: boolean, signal?: AbortSignal) {
-  const endpoint = withCookieProbe ? '/health?setTestCookie=1' : '/health';
-  return apiRequest<HealthResponse>(endpoint, { signal });
-}
-
 function getErrorMessage(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Unable to reach API';
 }
@@ -19,7 +14,7 @@ export function HealthStatusCard() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetchHealthStatus(false, controller.signal)
+    apiRequest<HealthResponse>('/health', { skipAuth: true, signal: controller.signal })
       .then((data) => {
         setHealth(data);
         setError(null);
@@ -38,12 +33,12 @@ export function HealthStatusCard() {
     return () => controller.abort();
   }, []);
 
-  async function handleCheck(withCookieProbe: boolean) {
+  async function handleRefresh() {
     setLoading(true);
     setError(null);
 
     try {
-      const data = await fetchHealthStatus(withCookieProbe);
+      const data = await apiRequest<HealthResponse>('/health', { skipAuth: true });
       setHealth(data);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -54,56 +49,64 @@ export function HealthStatusCard() {
   }
 
   return (
-    <section className="card" aria-labelledby="system-status-title">
-      <div className="card-header">
-        <h2 id="system-status-title">API &amp; Database Status</h2>
-        <span className={`badge ${health?.ok ? 'badge-ok' : 'badge-warn'}`}>
+    <section
+      className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs"
+      aria-labelledby="system-status-title"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="system-status-title" className="text-base font-semibold text-slate-900">
+          API &amp; Database Status
+        </h2>
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+            health?.ok ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+          }`}
+        >
           {loading ? 'Checking...' : health?.ok ? 'Online' : 'Unavailable'}
         </span>
       </div>
 
       {error ? (
-        <p className="error-text" role="alert">
+        <p className="mt-3 text-sm text-red-700" role="alert">
           {error}
         </p>
       ) : null}
 
       {health ? (
-        <dl className="status-grid">
+        <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <dt>Service</dt>
-            <dd>{health.service}</dd>
+            <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">Service</dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-900">{health.service}</dd>
           </div>
           <div>
-            <dt>Database</dt>
-            <dd>{health.db}</dd>
+            <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">Database</dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-900">{health.db}</dd>
           </div>
           <div>
-            <dt>Environment</dt>
-            <dd>{health.environment}</dd>
+            <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+              Environment
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-900">{health.environment}</dd>
           </div>
           <div>
-            <dt>Checked At</dt>
-            <dd>{new Date(health.timestamp).toLocaleTimeString()}</dd>
+            <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+              Checked At
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-900">
+              {new Date(health.timestamp).toLocaleTimeString()}
+            </dd>
           </div>
         </dl>
       ) : null}
 
-      {health?.probeCookieSet ? (
-        <p className="muted">Probe cookie requested. Verify proxy_probe under Application Cookies.</p>
-      ) : null}
-
-      <div className="actions">
-        <button type="button" className="btn" onClick={() => void handleCheck(false)} disabled={loading}>
-          Refresh
-        </button>
+      <div className="mt-4">
         <button
           type="button"
-          className="btn btn-secondary"
-          onClick={() => void handleCheck(true)}
+          className="inline-flex cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => void handleRefresh()}
           disabled={loading}
         >
-          Test Proxy Cookie
+          Refresh Status
         </button>
       </div>
     </section>
