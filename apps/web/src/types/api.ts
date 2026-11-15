@@ -4,7 +4,11 @@ export interface HealthResponse {
   db: 'connected' | 'connecting' | 'disconnected';
   environment: string;
   timestamp: string;
-  probeCookieSet?: boolean;
+}
+
+export interface ApiSuccessResponse<T> {
+  ok: true;
+  data: T;
 }
 
 export interface ApiErrorResponse {
