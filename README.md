@@ -14,8 +14,6 @@ Production-focused Enterprise Administration Dashboard built with a **React + Ty
 │   ├── reports/            # Security review and test strategy docs
 │   └── audits/             # Lighthouse, accessibility, performance, bundle, and E2E reports
 ├── exercises/              # Standalone technical exercises (isolated from the main app)
-├── .github/
-│   └── pull_request_template.md
 └── package.json            # Root convenience scripts
 ```
 
