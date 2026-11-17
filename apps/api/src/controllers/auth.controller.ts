@@ -55,7 +55,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   const { email, password } = parsed.data;
-  const user = await User.findOne({ email: email.toLowerCase() }).select("+passwordHash");
+  const user = await User.findOne({ email: email.toLowerCase() }).select("+passwordHash").lean();
 
   if (!user) {
     res.status(401).json({
@@ -85,31 +85,32 @@ export async function login(req: Request, res: Response): Promise<void> {
   const rawRefresh = generateOpaqueToken();
   const csrfToken = createCsrfToken();
 
-  await RefreshToken.create({
-    userId: user._id,
-    tokenHash: hashToken(rawRefresh),
-    familyId: crypto.randomUUID(),
-    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
-  });
+  await Promise.all([
+    RefreshToken.create({
+      userId: user._id,
+      tokenHash: hashToken(rawRefresh),
+      familyId: crypto.randomUUID(),
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    }),
+    recordAuditEvent({
+      actor: {
+        userId: String(user._id),
+        name: user.name,
+        email: user.email,
+        role: user.role as Role,
+      },
+      action: "auth.login",
+      resourceType: "auth",
+      resourceId: String(user._id),
+      summary: `Signed in as ${user.role}`,
+    }),
+  ]);
 
   setAuthCookies(res, rawRefresh, csrfToken);
 
   const accessToken = signAccessToken({
     sub: String(user._id),
     role: user.role as Role,
-  });
-
-  await recordAuditEvent({
-    actor: {
-      userId: String(user._id),
-      name: user.name,
-      email: user.email,
-      role: user.role as Role,
-    },
-    action: "auth.login",
-    resourceType: "auth",
-    resourceId: String(user._id),
-    summary: `Signed in as ${user.role}`,
   });
 
   res.status(200).json({
@@ -233,7 +234,9 @@ export async function logout(req: Request, res: Response): Promise<void> {
   const rawRefresh = req.cookies?.[REFRESH_COOKIE_NAME];
 
   if (typeof rawRefresh === "string" && rawRefresh) {
-    const tokenDoc = await RefreshToken.findOne({ tokenHash: hashToken(rawRefresh) });
+    const tokenDoc = await RefreshToken.findOne({ tokenHash: hashToken(rawRefresh) })
+      .select("familyId")
+      .lean();
     if (tokenDoc) {
       await RefreshToken.updateMany(
         { familyId: tokenDoc.familyId, revokedAt: null },
@@ -308,20 +311,21 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     user.name = parsed.data.name;
   }
 
-  await user.save();
-
-  await recordAuditEvent({
-    actor: {
-      userId: String(user._id),
-      name: user.name,
-      email: user.email,
-      role: user.role as Role,
-    },
-    action: "auth.profile_updated",
-    resourceType: "auth",
-    resourceId: String(user._id),
-    summary: parsed.data.newPassword ? "Updated profile and password" : "Updated display name",
-  });
+  await Promise.all([
+    user.save(),
+    recordAuditEvent({
+      actor: {
+        userId: String(user._id),
+        name: user.name,
+        email: user.email,
+        role: user.role as Role,
+      },
+      action: "auth.profile_updated",
+      resourceType: "auth",
+      resourceId: String(user._id),
+      summary: parsed.data.newPassword ? "Updated profile and password" : "Updated display name",
+    }),
+  ]);
 
   res.status(200).json({
     ok: true,

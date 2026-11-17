@@ -10,7 +10,7 @@ import {
 import { User } from "../models/User.js";
 import { recordAuditEvent } from "../utils/audit.js";
 import { sendApiError } from "../utils/httpErrors.js";
-import { parsePaginationParams, resolvePaginationWindow } from "../utils/pagination.js";
+import { parsePaginationParams, resolvePaginatedItems } from "../utils/pagination.js";
 
 const createProjectSchema = z.object({
   name: z.string().trim().min(2, "Project name must be at least 2 characters").max(100),
@@ -118,20 +118,34 @@ export async function listProjects(req: Request, res: Response): Promise<void> {
     filter.status = status;
   }
 
-  const [total, statusCounts] = await Promise.all([
-    Project.countDocuments(filter),
+  const [statusCounts, { items: projects, pagination }] = await Promise.all([
     Project.aggregate<{ _id: string; count: number }>([
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
+    resolvePaginatedItems(page, limit, Project.countDocuments(filter), (skip) =>
+      Project.aggregate<Parameters<typeof serializeProject>[0]>([
+        { $match: filter },
+        { $sort: { updatedAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: User.collection.name,
+            localField: "ownerId",
+            foreignField: "_id",
+            pipeline: [{ $project: { _id: 1, name: 1, email: 1, role: 1 } }],
+            as: "ownerDocs",
+          },
+        },
+        {
+          $set: {
+            ownerId: { $ifNull: [{ $arrayElemAt: ["$ownerDocs", 0] }, "$ownerId"] },
+          },
+        },
+        { $unset: "ownerDocs" },
+      ]),
+    ),
   ]);
-
-  const { skip, pagination } = resolvePaginationWindow(page, limit, total);
-  const projects = await Project.find(filter)
-    .populate("ownerId", "name email role")
-    .sort({ updatedAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
 
   const statusMap = new Map(statusCounts.map((entry) => [entry._id, entry.count]));
   const completed = statusMap.get("completed") ?? 0;
@@ -172,50 +186,69 @@ export async function createProject(req: Request, res: Response): Promise<void> 
   }
 
   let assignedOwnerId = req.auth!.userId;
-  if (data.ownerId) {
+  let ownerSummary: PopulatedOwner = {
+    _id: req.auth!.userId,
+    name: req.auth!.name,
+    email: req.auth!.email,
+    role: req.auth!.role,
+  };
+
+  if (data.ownerId && data.ownerId !== req.auth!.userId) {
     if (!mongoose.isValidObjectId(data.ownerId)) {
       sendApiError(res, 400, "VALIDATION_ERROR", "Invalid owner user id");
       return;
     }
-    const ownerExists = await User.exists({ _id: data.ownerId, status: "active" });
-    if (!ownerExists) {
+    const ownerDoc = await User.findOne({ _id: data.ownerId, status: "active" })
+      .select("_id name email role")
+      .lean();
+    if (!ownerDoc) {
       sendApiError(res, 400, "VALIDATION_ERROR", "Selected project owner is unavailable");
       return;
     }
-    assignedOwnerId = data.ownerId;
+    assignedOwnerId = String(ownerDoc._id);
+    ownerSummary = {
+      _id: ownerDoc._id,
+      name: ownerDoc.name,
+      email: ownerDoc.email,
+      role: ownerDoc.role,
+    };
   }
 
   const tasksCompleted =
     data.status === "completed" ? data.tasksTotal : Math.min(data.tasksCompleted, data.tasksTotal);
   const progress = resolveProgress(data.status, data.tasksTotal, tasksCompleted, data.progress);
+  const projectId = new mongoose.Types.ObjectId();
 
-  const created = await Project.create({
-    name: data.name,
-    description: data.description,
-    category: data.category,
-    status: data.status,
-    priority: data.priority,
-    tasksTotal: data.tasksTotal,
-    tasksCompleted,
-    progress,
-    dueDate: data.dueDate ?? null,
-    ownerId: assignedOwnerId,
-  });
-
-  await created.populate("ownerId", "name email role");
-
-  await recordAuditEvent({
-    actor: req.auth!,
-    action: "project.created",
-    resourceType: "project",
-    resourceId: String(created._id),
-    summary: `Created project "${created.name}" (${created.category})`,
-  });
+  const [created] = await Promise.all([
+    Project.create({
+      _id: projectId,
+      name: data.name,
+      description: data.description,
+      category: data.category,
+      status: data.status,
+      priority: data.priority,
+      tasksTotal: data.tasksTotal,
+      tasksCompleted,
+      progress,
+      dueDate: data.dueDate ?? null,
+      ownerId: assignedOwnerId,
+    }),
+    recordAuditEvent({
+      actor: req.auth!,
+      action: "project.created",
+      resourceType: "project",
+      resourceId: String(projectId),
+      summary: `Created project "${data.name}" (${data.category})`,
+    }),
+  ]);
 
   res.status(201).json({
     ok: true,
     data: {
-      project: serializeProject(created.toObject() as unknown as Parameters<typeof serializeProject>[0]),
+      project: serializeProject({
+        ...(created.toObject() as unknown as Parameters<typeof serializeProject>[0]),
+        ownerId: ownerSummary,
+      }),
     },
   });
 }
@@ -282,16 +315,17 @@ export async function updateProject(req: Request, res: Response): Promise<void> 
     patch.progress,
   );
 
-  await existing.save();
+  await Promise.all([
+    existing.save(),
+    recordAuditEvent({
+      actor: req.auth!,
+      action: "project.updated",
+      resourceType: "project",
+      resourceId: String(existing._id),
+      summary: `Updated project "${existing.name}" (${existing.status}, ${existing.progress}%)`,
+    }),
+  ]);
   await existing.populate("ownerId", "name email role");
-
-  await recordAuditEvent({
-    actor: req.auth!,
-    action: "project.updated",
-    resourceType: "project",
-    resourceId: String(existing._id),
-    summary: `Updated project "${existing.name}" (${existing.status}, ${existing.progress}%)`,
-  });
 
   res.status(200).json({
     ok: true,
@@ -308,7 +342,7 @@ export async function deleteProject(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  const deleted = await Project.findByIdAndDelete(id).lean();
+  const deleted = await Project.findByIdAndDelete(id).select("name").lean();
   if (!deleted) {
     sendApiError(res, 404, "NOT_FOUND", "Project not found");
     return;
@@ -365,10 +399,14 @@ export async function importProjects(req: Request, res: Response): Promise<void>
     };
   });
 
+  const ownerSummary: PopulatedOwner = {
+    _id: req.auth!.userId,
+    name: req.auth!.name,
+    email: req.auth!.email,
+    role: req.auth!.role,
+  };
+
   const inserted = await Project.insertMany(docsToInsert);
-  const populated = await Project.find({ _id: { $in: inserted.map((doc) => doc._id) } })
-    .populate("ownerId", "name email role")
-    .lean();
 
   await recordAuditEvent({
     actor: req.auth!,
@@ -381,9 +419,12 @@ export async function importProjects(req: Request, res: Response): Promise<void>
   res.status(201).json({
     ok: true,
     data: {
-      importedCount: populated.length,
-      projects: populated.map((project) =>
-        serializeProject(project as unknown as Parameters<typeof serializeProject>[0]),
+      importedCount: inserted.length,
+      projects: inserted.map((project) =>
+        serializeProject({
+          ...project.toObject(),
+          ownerId: ownerSummary,
+        } as unknown as Parameters<typeof serializeProject>[0]),
       ),
     },
   });

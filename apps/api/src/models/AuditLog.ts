@@ -18,6 +18,7 @@ const auditLogSchema = new mongoose.Schema(
 );
 
 auditLogSchema.index({ createdAt: -1 });
+auditLogSchema.index({ resourceType: 1, createdAt: -1 });
 
 export type AuditLogRecord = InferSchemaType<typeof auditLogSchema> & {
   _id: mongoose.Types.ObjectId;

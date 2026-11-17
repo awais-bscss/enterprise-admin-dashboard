@@ -25,6 +25,10 @@ const projectSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+projectSchema.index({ updatedAt: -1 });
+projectSchema.index({ status: 1, category: 1, updatedAt: -1 });
+projectSchema.index({ createdAt: -1 });
+
 export type ProjectRecord = InferSchemaType<typeof projectSchema> & {
   _id: mongoose.Types.ObjectId;
 };

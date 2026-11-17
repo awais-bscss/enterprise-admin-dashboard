@@ -186,8 +186,8 @@ export function useProjectImport(onImported: () => void) {
 
   const importMutation = useMutation({
     mutationFn: (batch: ProjectInput[]) => projectsService.importBatch(batch),
-    onSuccess: async (data) => {
-      await invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'users', 'audit']);
+    onSuccess: (data) => {
+      void invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'users', 'audit']);
       toast.success(`Imported ${data.importedCount} project(s).`);
       onImported();
     },

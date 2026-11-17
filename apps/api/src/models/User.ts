@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+userSchema.index({ createdAt: -1 });
+
 export type UserRecord = InferSchemaType<typeof userSchema> & {
   _id: mongoose.Types.ObjectId;
   role: Role;

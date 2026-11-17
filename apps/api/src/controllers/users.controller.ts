@@ -8,7 +8,7 @@ import { RefreshToken } from "../models/RefreshToken.js";
 import { User } from "../models/User.js";
 import { recordAuditEvent } from "../utils/audit.js";
 import { sendApiError } from "../utils/httpErrors.js";
-import { parsePaginationParams, resolvePaginationWindow } from "../utils/pagination.js";
+import { parsePaginationParams, resolvePaginatedItems } from "../utils/pagination.js";
 import {
   getWorkspaceSecurityDefaults,
   validateWorkspacePassword,
@@ -77,34 +77,44 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
     filter.status = status;
   }
 
-  const [total, allUsers, projectAgg] = await Promise.all([
-    User.countDocuments(filter),
-    User.find().select("role status").lean(),
+  const [userSummaryAgg, projectAgg, { items: users, pagination }] = await Promise.all([
+    User.aggregate<{ _id: { role: Role; status: string }; count: number }>([
+      { $group: { _id: { role: "$role", status: "$status" }, count: { $sum: 1 } } },
+    ]),
     Project.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
       { $group: { _id: "$ownerId", count: { $sum: 1 } } },
     ]),
+    resolvePaginatedItems(page, limit, User.countDocuments(filter), (skip) =>
+      User.find(filter)
+        .select("name email role status createdAt")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ),
   ]);
-
-  const { skip, pagination } = resolvePaginationWindow(page, limit, total);
-  const users = await User.find(filter)
-    .select("name email role status createdAt")
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
 
   const projectCountMap = new Map<string, number>(
     projectAgg.map((entry) => [String(entry._id), entry.count]),
   );
 
   const stats = {
-    total: allUsers.length,
-    active: allUsers.filter((u) => u.status === "active").length,
-    suspended: allUsers.filter((u) => u.status === "suspended").length,
-    admins: allUsers.filter((u) => u.role === "admin").length,
-    managers: allUsers.filter((u) => u.role === "manager").length,
-    viewers: allUsers.filter((u) => u.role === "viewer").length,
+    total: 0,
+    active: 0,
+    suspended: 0,
+    admins: 0,
+    managers: 0,
+    viewers: 0,
   };
+  for (const entry of userSummaryAgg) {
+    stats.total += entry.count;
+    if (entry._id.status === "active") stats.active += entry.count;
+    else if (entry._id.status === "suspended") stats.suspended += entry.count;
+
+    if (entry._id.role === "admin") stats.admins += entry.count;
+    else if (entry._id.role === "manager") stats.managers += entry.count;
+    else if (entry._id.role === "viewer") stats.viewers += entry.count;
+  }
 
   res.status(200).json({
     ok: true,
@@ -129,7 +139,10 @@ export async function createUser(req: Request, res: Response): Promise<void> {
   }
 
   const { name, email, password, status } = parsed.data;
-  const policy = await getWorkspaceSecurityDefaults();
+  const [policy, duplicate] = await Promise.all([
+    getWorkspaceSecurityDefaults(),
+    User.exists({ email }),
+  ]);
   const passwordError = await validateWorkspacePassword(password, policy.enforceStrongPasswords);
   if (passwordError) {
     sendApiError(res, 400, "VALIDATION_ERROR", passwordError);
@@ -138,28 +151,30 @@ export async function createUser(req: Request, res: Response): Promise<void> {
 
   const assignedRole = parsed.data.role ?? policy.defaultNewUserRole;
 
-  const duplicate = await User.exists({ email });
   if (duplicate) {
     sendApiError(res, 409, "EMAIL_EXISTS", "A user with this email already exists");
     return;
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const created = await User.create({
-    name,
-    email,
-    passwordHash,
-    role: assignedRole,
-    status,
-  });
-
-  await recordAuditEvent({
-    actor: req.auth!,
-    action: "user.created",
-    resourceType: "user",
-    resourceId: String(created._id),
-    summary: `Added user ${created.email} as ${created.role}`,
-  });
+  const userId = new mongoose.Types.ObjectId();
+  const [created] = await Promise.all([
+    User.create({
+      _id: userId,
+      name,
+      email,
+      passwordHash,
+      role: assignedRole,
+      status,
+    }),
+    recordAuditEvent({
+      actor: req.auth!,
+      action: "user.created",
+      resourceType: "user",
+      resourceId: String(userId),
+      summary: `Added user ${email} as ${assignedRole}`,
+    }),
+  ]);
 
   res.status(201).json({
     ok: true,
@@ -224,21 +239,20 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     if (parsed.data.status === "suspended") revokeTokens = true;
   }
 
-  await user.save();
-
-  if (revokeTokens) {
-    await RefreshToken.updateMany({ userId: user._id, revokedAt: null }, { revokedAt: new Date() });
-  }
-
-  const projectCount = await Project.countDocuments({ ownerId: user._id });
-
-  await recordAuditEvent({
-    actor: req.auth!,
-    action: "user.updated",
-    resourceType: "user",
-    resourceId: String(user._id),
-    summary: `Updated ${user.email} (${user.role}, ${user.status})`,
-  });
+  const [, , projectCount] = await Promise.all([
+    user.save(),
+    revokeTokens
+      ? RefreshToken.updateMany({ userId: user._id, revokedAt: null }, { revokedAt: new Date() })
+      : Promise.resolve(),
+    Project.countDocuments({ ownerId: user._id }),
+    recordAuditEvent({
+      actor: req.auth!,
+      action: "user.updated",
+      resourceType: "user",
+      resourceId: String(user._id),
+      summary: `Updated ${user.email} (${user.role}, ${user.status})`,
+    }),
+  ]);
 
   res.status(200).json({
     ok: true,
@@ -264,20 +278,19 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // Reassign any projects owned by the removed account to the acting admin.
+  // Reassign any projects owned by the removed account and log the deletion in parallel.
   await Promise.all([
     Project.updateMany({ ownerId: existing._id }, { ownerId: req.auth!.userId }),
     RefreshToken.deleteMany({ userId: existing._id }),
     User.deleteOne({ _id: existing._id }),
+    recordAuditEvent({
+      actor: req.auth!,
+      action: "user.deleted",
+      resourceType: "user",
+      resourceId: String(existing._id),
+      summary: `Deleted user ${existing.email} (${existing.role})`,
+    }),
   ]);
-
-  await recordAuditEvent({
-    actor: req.auth!,
-    action: "user.deleted",
-    resourceType: "user",
-    resourceId: String(existing._id),
-    summary: `Deleted user ${existing.email} (${existing.role})`,
-  });
 
   res.status(200).json({ ok: true, data: { deletedId: String(existing._id) } });
 }

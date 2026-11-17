@@ -74,8 +74,8 @@ export function useUsersDirectory() {
     mutationFn: ({ member, role }: { member: DirectoryPreviewUser; role: Role }) =>
       usersService.update(member.id, { role }),
     onMutate: () => setActionError(null),
-    onSuccess: async (updated) => {
-      await invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'audit']);
+    onSuccess: (updated) => {
+      void invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'audit']);
       toast.success(`Updated ${updated.name}'s role to ${updated.role}.`);
     },
     onError: (err: unknown) => {
@@ -91,8 +91,8 @@ export function useUsersDirectory() {
         status: member.status === 'active' ? 'suspended' : 'active',
       }),
     onMutate: () => setActionError(null),
-    onSuccess: async (updated) => {
-      await invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'audit']);
+    onSuccess: (updated) => {
+      void invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'audit']);
       toast.success(
         updated.status === 'active'
           ? `Activated ${updated.name}.`
@@ -109,11 +109,11 @@ export function useUsersDirectory() {
   const deleteMutation = useMutation({
     mutationFn: (member: DirectoryPreviewUser) => usersService.remove(member.id),
     onMutate: () => setActionError(null),
-    onSuccess: async (_deletedId, member) => {
+    onSuccess: (_deletedId, member) => {
       if (users.length <= 1 && page > 1) {
         updateParams({ page: page - 1 });
       }
-      await invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'projects', 'audit']);
+      void invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'projects', 'audit']);
       toast.success(`Removed user "${member.name}".`);
     },
     onError: (err: unknown) => {

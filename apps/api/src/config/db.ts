@@ -23,11 +23,20 @@ export function getDbStatus(): DbStatus {
 }
 
 export async function connectToDatabase(): Promise<boolean> {
-  if (mongoose.connection.readyState === 1) return true;
+  const readyState = mongoose.connection.readyState;
+  if (readyState === 1) return true;
+
+  if (readyState === 0 || readyState === 3) {
+    cache.conn = null;
+    // Clear any resolved promise from an earlier connection so disconnects trigger a fresh dial.
+    cache.promise = null;
+  }
 
   if (!cache.promise) {
     cache.promise = mongoose.connect(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 12000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 30000,
       maxPoolSize: 10,
     });
   }

@@ -79,8 +79,8 @@ export function useProjectsWorkspace() {
       });
     },
     onMutate: () => setActionError(null),
-    onSuccess: async (updated) => {
-      await invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'audit']);
+    onSuccess: (updated) => {
+      void invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'audit']);
       toast.success(
         updated.status === 'completed'
           ? `"${updated.name}" marked completed.`
@@ -97,11 +97,11 @@ export function useProjectsWorkspace() {
   const deleteMutation = useMutation({
     mutationFn: (project: ProjectItem) => projectsService.remove(project.id),
     onMutate: () => setActionError(null),
-    onSuccess: async (_deletedId, project) => {
+    onSuccess: (_deletedId, project) => {
       if (projects.length <= 1 && page > 1) {
         updateParams({ page: page - 1 });
       }
-      await invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'users', 'audit']);
+      void invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'users', 'audit']);
       toast.success(`Deleted "${project.name}".`);
     },
     onError: (err: unknown) => {

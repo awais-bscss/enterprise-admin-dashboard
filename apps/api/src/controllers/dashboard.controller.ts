@@ -33,28 +33,74 @@ function buildRecentDayKeys(days: number): { key: string; label: string }[] {
 export async function getOverview(req: Request, res: Response): Promise<void> {
   const auth = req.auth!;
   const fiveDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+  const includeActiveSessions = auth.permissions.includes("audit:read");
 
   const [
-    totalUsers,
-    activeUsers,
-    roleAgg,
+    userStatsAgg,
     directoryPreview,
-    projects,
+    projectMetrics,
+    recentProjects,
     auditRecent,
+    activeSessions,
   ] = await Promise.all([
-    User.countDocuments(),
-    User.countDocuments({ status: "active" }),
-    User.aggregate<{ _id: Role; count: number }>([
-      { $group: { _id: "$role", count: { $sum: 1 } } },
+    User.aggregate<{ _id: { role: Role; status: string }; count: number }>([
+      { $group: { _id: { role: "$role", status: "$status" }, count: { $sum: 1 } } },
     ]),
     User.find().select("name email role status").sort({ createdAt: 1 }).limit(4).lean(),
-    Project.find().populate("ownerId", "name email role").sort({ updatedAt: -1 }).lean(),
+    Project.find().select("status category progress tasksTotal tasksCompleted").lean(),
+    Project.aggregate<{
+      _id: unknown;
+      name: string;
+      category: string;
+      status: string;
+      priority: string;
+      progress: number;
+      tasksTotal: number;
+      tasksCompleted: number;
+      ownerName: string;
+    }>([
+      { $sort: { updatedAt: -1 } },
+      { $limit: 4 },
+      {
+        $lookup: {
+          from: User.collection.name,
+          localField: "ownerId",
+          foreignField: "_id",
+          pipeline: [{ $project: { name: 1 } }],
+          as: "ownerDoc",
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          category: 1,
+          status: 1,
+          priority: 1,
+          progress: 1,
+          tasksTotal: 1,
+          tasksCompleted: 1,
+          ownerName: { $ifNull: [{ $arrayElemAt: ["$ownerDoc.name", 0] }, "Member"] },
+        },
+      },
+    ]),
     AuditLog.find({ createdAt: { $gte: fiveDaysAgo } })
       .select("action resourceType createdAt")
       .lean(),
+    includeActiveSessions
+      ? RefreshToken.countDocuments({ revokedAt: null, expiresAt: { $gt: new Date() } })
+      : Promise.resolve(null),
   ]);
 
-  const roleCountMap = new Map<Role, number>(roleAgg.map((entry) => [entry._id, entry.count]));
+  let totalUsers = 0;
+  let activeUsers = 0;
+  const roleCountMap = new Map<Role, number>();
+  for (const row of userStatsAgg) {
+    totalUsers += row.count;
+    if (row._id.status === "active") {
+      activeUsers += row.count;
+    }
+    roleCountMap.set(row._id.role, (roleCountMap.get(row._id.role) ?? 0) + row.count);
+  }
   const roleBreakdown = ROLES.map((role) => ({
     role,
     count: roleCountMap.get(role) ?? 0,
@@ -77,7 +123,7 @@ export async function getOverview(req: Request, res: Response): Promise<void> {
     categoryStats.set(cat, { progressSum: 0, count: 0, tasksTotal: 0 });
   }
 
-  for (const project of projects) {
+  for (const project of projectMetrics) {
     const status = project.status as ProjectStatus;
     statusMap.set(status, (statusMap.get(status) ?? 0) + 1);
 
@@ -94,7 +140,7 @@ export async function getOverview(req: Request, res: Response): Promise<void> {
     }
   }
 
-  const totalProjects = projects.length;
+  const totalProjects = projectMetrics.length;
   const completedProjects = statusMap.get("completed") ?? 0;
   const inProgressProjects = statusMap.get("in_progress") ?? 0;
   const upcomingProjects = statusMap.get("upcoming") ?? 0;
@@ -143,14 +189,6 @@ export async function getOverview(req: Request, res: Response): Promise<void> {
     };
   });
 
-  let activeSessions: number | null = null;
-  if (auth.permissions.includes("audit:read")) {
-    activeSessions = await RefreshToken.countDocuments({
-      revokedAt: null,
-      expiresAt: { $gt: new Date() },
-    });
-  }
-
   res.status(200).json({
     ok: true,
     data: {
@@ -172,7 +210,7 @@ export async function getOverview(req: Request, res: Response): Promise<void> {
       projectStatusBreakdown,
       categoryProgress,
       activityTrend,
-      recentProjects: projects.slice(0, 4).map((project) => ({
+      recentProjects: recentProjects.map((project) => ({
         id: String(project._id),
         name: project.name,
         category: project.category,
@@ -181,10 +219,7 @@ export async function getOverview(req: Request, res: Response): Promise<void> {
         progress: project.progress,
         tasksTotal: project.tasksTotal,
         tasksCompleted: project.tasksCompleted,
-        ownerName:
-          project.ownerId && typeof project.ownerId === "object" && "name" in project.ownerId
-            ? String(project.ownerId.name)
-            : "Member",
+        ownerName: project.ownerName,
       })),
       directoryPreview: directoryPreview.map((item) => ({
         id: String(item._id),

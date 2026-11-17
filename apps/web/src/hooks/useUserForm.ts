@@ -46,8 +46,8 @@ export function useUserForm(
             role,
             status,
           }),
-    onSuccess: async (saved) => {
-      await invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'projects', 'audit']);
+    onSuccess: (saved) => {
+      void invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'projects', 'audit']);
       toast.success(
         isEditing ? `Updated member "${saved.name}".` : `Created user "${saved.name}".`,
       );

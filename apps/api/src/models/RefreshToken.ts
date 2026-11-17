@@ -13,6 +13,7 @@ const refreshTokenSchema = new mongoose.Schema(
 );
 
 refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+refreshTokenSchema.index({ revokedAt: 1, expiresAt: 1 });
 
 export type RefreshTokenRecord = InferSchemaType<typeof refreshTokenSchema> & {
   _id: mongoose.Types.ObjectId;

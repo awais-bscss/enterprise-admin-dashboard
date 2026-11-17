@@ -36,3 +36,25 @@ export function resolvePaginationWindow(
     pagination: { page, limit, total, totalPages },
   };
 }
+
+/**
+ * Fetches a paginated slice, running page 1's item query alongside the count in
+ * parallel because skip is guaranteed to be 0 before clamping.
+ */
+export async function resolvePaginatedItems<T>(
+  requestedPage: number,
+  limit: number,
+  totalPromise: Promise<number>,
+  fetchSlice: (skip: number) => Promise<T[]>,
+): Promise<{ items: T[]; pagination: PaginationMeta }> {
+  if (requestedPage === 1) {
+    const [total, items] = await Promise.all([totalPromise, fetchSlice(0)]);
+    const { pagination } = resolvePaginationWindow(1, limit, total);
+    return { items, pagination };
+  }
+
+  const total = await totalPromise;
+  const { skip, pagination } = resolvePaginationWindow(requestedPage, limit, total);
+  const items = await fetchSlice(skip);
+  return { items, pagination };
+}

@@ -39,8 +39,8 @@ export function useProjectForm(
   const saveMutation = useMutation({
     mutationFn: (payload: ProjectInput) =>
       project ? projectsService.update(project.id, payload) : projectsService.create(payload),
-    onSuccess: async (saved) => {
-      await invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'users', 'audit']);
+    onSuccess: (saved) => {
+      void invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'users', 'audit']);
       toast.success(
         isEditing ? `Updated "${saved.name}".` : `Created project "${saved.name}".`,
       );

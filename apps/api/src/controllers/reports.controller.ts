@@ -13,7 +13,10 @@ export async function exportComplianceReport(req: Request, res: Response): Promi
   const format = req.query.format === "csv" ? "csv" : "json";
 
   const [projects, users] = await Promise.all([
-    Project.find().populate("ownerId", "name email").sort({ createdAt: -1 }).lean(),
+    Project.find()
+      .select("name category status priority progress tasksCompleted tasksTotal ownerId")
+      .sort({ createdAt: -1 })
+      .lean(),
     User.find().select("name email role status createdAt").sort({ createdAt: -1 }).lean(),
   ]);
 
@@ -25,12 +28,10 @@ export async function exportComplianceReport(req: Request, res: Response): Promi
   });
 
   if (format === "csv") {
+    const ownerNameById = new Map(users.map((user) => [String(user._id), user.name]));
     const header = ["Name", "Category", "Status", "Priority", "Progress%", "CompletedTasks", "TotalTasks", "Owner"].join(",");
     const rows = projects.map((project) => {
-      const ownerName =
-        project.ownerId && typeof project.ownerId === "object" && "name" in project.ownerId
-          ? String(project.ownerId.name)
-          : "Member";
+      const ownerName = ownerNameById.get(String(project.ownerId)) ?? "Member";
       return [
         csvCell(project.name),
         csvCell(project.category),
