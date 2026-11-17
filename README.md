@@ -19,17 +19,17 @@ Production-focused Enterprise Administration Dashboard built with a **React + Ty
 └── package.json            # Root convenience scripts
 ```
 
-## Planned Architecture
+## Architecture Overview
 
-- **Same-Domain `/api` Proxy *(planned)*:** Client API requests will target `/api/*` via Vite dev proxy locally and reverse-proxy rewrites in production so `httpOnly` `SameSite` cookies work reliably without cross-site cookie restrictions. See [Architecture Decisions](docs/decisions.md).
-- **Security-First Auth & RBAC *(planned)*:** Short-lived in-memory access tokens, rotating `httpOnly` refresh cookies, centralized request cancellation/retry/error normalization, and permission-aware routing and UI.
-- **Quality & Performance Gates *(planned)*:** Vitest + React Testing Library + Playwright test pyramid alongside measured Core Web Vitals, accessibility, and bundle audits.
+- **Same-Domain `/api` Proxy:** Client API requests target `/api/*` via Vite dev proxy locally and Vercel reverse-proxy rewrites in production (`apps/web/vercel.json`) so `httpOnly` `SameSite=Lax` cookies work cleanly with `connect-src 'self'`. See [Architecture Decisions](docs/decisions.md).
+- **Security-First Auth & RBAC:** Short-lived in-memory JWT access tokens, rotating `httpOnly` refresh cookies with family reuse detection, HMAC double-submit CSRF checks, centralized Axios retry/cancellation/error normalization, and permission-aware routing and UI. See [Security Review](docs/reports/security-review.md).
+- **Quality & Performance Gates:** Vitest, React Testing Library, MSW, Playwright, Axe WCAG 2.1 AA, Lighthouse, and Vite bundle code-splitting implemented and audited. See [Test Strategy](docs/reports/test-strategy.md) and [`docs/audits/`](docs/audits/lighthouse-report.md).
 
 ## Tech Stack
 
 - **Frontend (`apps/web`):** React 19, TypeScript, Vite, Oxlint
 - **Backend (`apps/api`):** Node.js, Express 5, TypeScript, MongoDB (Mongoose)
-- **Testing & Audits:** Vitest, React Testing Library, Playwright, Lighthouse *(setup pending)*
+- **Testing & Audits:** Vitest, React Testing Library, MSW, Playwright, `@axe-core/playwright`, Lighthouse CLI
 
 ## Getting Started
 
@@ -52,10 +52,13 @@ npm run install:api
 npm run dev:api
 npm run dev:web
 
-# Typecheck, lint, and build
+# Typecheck, lint, test, and build
 npm run typecheck:api
 npm run compile:api
 npm run lint:web
+npm run test:web
+npm run test:e2e
+npm run test:exercise
 npm run build:web
 ```
 
@@ -64,5 +67,10 @@ npm run build:web
 ## Documentation & Reports
 
 - [Architecture Decision Records](docs/decisions.md)
-- `docs/reports/` — Security review and test strategy documents *(upcoming)*
-- `docs/audits/` — Lighthouse, accessibility, performance, bundle analysis, and E2E reports *(upcoming)*
+- [Security Review](docs/reports/security-review.md)
+- [Test Strategy](docs/reports/test-strategy.md)
+- [Lighthouse Audit Report](docs/audits/lighthouse-report.md)
+- [Accessibility Audit Report](docs/audits/accessibility-report.md)
+- [Performance & Bundle Report](docs/audits/performance-and-bundle-report.md)
+- [End-to-End Verification Report](docs/audits/e2e-report.md)
+- [Standalone Structured Output Adapter Exercise](exercises/structured-output-adapter/README.md)

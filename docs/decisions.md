@@ -6,7 +6,7 @@ This document records key architectural and technical decisions made for the Ent
 
 ## ADR-001: Same-Domain `/api` Reverse Proxy Rewrite Architecture
 
-- **Status:** Accepted *(to be implemented & verified in API/proxy setup)*
+- **Status:** Implemented *(local proxy, edge rewrite + CSP headers, and API middleware configured; live deployed cookie round-trip check pending)* — see [Security Review](reports/security-review.md)
 - **Scope:** `apps/web`, `apps/api`, deployment routing
 
 ### Context
