@@ -8,6 +8,7 @@ import { RefreshToken } from "../models/RefreshToken.js";
 import { User } from "../models/User.js";
 import { recordAuditEvent } from "../utils/audit.js";
 import { sendApiError } from "../utils/httpErrors.js";
+import { parsePaginationParams, resolvePaginationWindow } from "../utils/pagination.js";
 import {
   getWorkspaceSecurityDefaults,
   validateWorkspacePassword,
@@ -59,6 +60,10 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const role = typeof req.query.role === "string" ? req.query.role.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
+  const { page, limit } = parsePaginationParams(req.query as Record<string, unknown>, {
+    limit: 10,
+    maxLimit: 100,
+  });
 
   const filter: Record<string, unknown> = {};
   if (query) {
@@ -72,13 +77,21 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
     filter.status = status;
   }
 
-  const [users, allUsers, projectAgg] = await Promise.all([
-    User.find(filter).select("name email role status createdAt").sort({ createdAt: -1 }).lean(),
+  const [total, allUsers, projectAgg] = await Promise.all([
+    User.countDocuments(filter),
     User.find().select("role status").lean(),
     Project.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
       { $group: { _id: "$ownerId", count: { $sum: 1 } } },
     ]),
   ]);
+
+  const { skip, pagination } = resolvePaginationWindow(page, limit, total);
+  const users = await User.find(filter)
+    .select("name email role status createdAt")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
 
   const projectCountMap = new Map<string, number>(
     projectAgg.map((entry) => [String(entry._id), entry.count]),
@@ -98,6 +111,7 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
     data: {
       users: users.map((u) => serializeDirectoryUser(u, projectCountMap.get(String(u._id)) ?? 0)),
       stats,
+      pagination,
     },
   });
 }

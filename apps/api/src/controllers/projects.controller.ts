@@ -10,6 +10,7 @@ import {
 import { User } from "../models/User.js";
 import { recordAuditEvent } from "../utils/audit.js";
 import { sendApiError } from "../utils/httpErrors.js";
+import { parsePaginationParams, resolvePaginationWindow } from "../utils/pagination.js";
 
 const createProjectSchema = z.object({
   name: z.string().trim().min(2, "Project name must be at least 2 characters").max(100),
@@ -100,6 +101,10 @@ export async function listProjects(req: Request, res: Response): Promise<void> {
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const category = typeof req.query.category === "string" ? req.query.category.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
+  const { page, limit } = parsePaginationParams(req.query as Record<string, unknown>, {
+    limit: 6,
+    maxLimit: 50,
+  });
 
   const filter: Record<string, unknown> = {};
   if (query) {
@@ -113,15 +118,37 @@ export async function listProjects(req: Request, res: Response): Promise<void> {
     filter.status = status;
   }
 
+  const [total, statusCounts] = await Promise.all([
+    Project.countDocuments(filter),
+    Project.aggregate<{ _id: string; count: number }>([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const { skip, pagination } = resolvePaginationWindow(page, limit, total);
   const projects = await Project.find(filter)
     .populate("ownerId", "name email role")
     .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(limit)
     .lean();
+
+  const statusMap = new Map(statusCounts.map((entry) => [entry._id, entry.count]));
+  const completed = statusMap.get("completed") ?? 0;
+  const inProgress = statusMap.get("in_progress") ?? 0;
+  const upcoming = statusMap.get("upcoming") ?? 0;
 
   res.status(200).json({
     ok: true,
     data: {
       projects: projects.map((project) => serializeProject(project as Parameters<typeof serializeProject>[0])),
+      stats: {
+        total: completed + inProgress + upcoming,
+        completed,
+        inProgress,
+        upcoming,
+      },
+      pagination,
     },
   });
 }
@@ -296,4 +323,68 @@ export async function deleteProject(req: Request, res: Response): Promise<void> 
   });
 
   res.status(200).json({ ok: true, data: { deletedId: String(deleted._id) } });
+}
+
+const importProjectsSchema = z.object({
+  projects: z
+    .array(createProjectSchema)
+    .min(1, "Select at least one valid project to import")
+    .max(25, "A maximum of 25 projects can be imported per batch"),
+});
+
+export async function importProjects(req: Request, res: Response): Promise<void> {
+  const parsed = importProjectsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendApiError(
+      res,
+      400,
+      "VALIDATION_ERROR",
+      parsed.error.issues[0]?.message ?? "Invalid project import payload",
+    );
+    return;
+  }
+
+  const docsToInsert = parsed.data.projects.map((item) => {
+    const tasksCompleted =
+      item.status === "completed"
+        ? item.tasksTotal
+        : Math.min(item.tasksCompleted, item.tasksTotal);
+    const progress = resolveProgress(item.status, item.tasksTotal, tasksCompleted, item.progress);
+
+    return {
+      name: item.name,
+      description: item.description,
+      category: item.category,
+      status: item.status,
+      priority: item.priority,
+      tasksTotal: item.tasksTotal,
+      tasksCompleted,
+      progress,
+      dueDate: item.dueDate && !Number.isNaN(item.dueDate.getTime()) ? item.dueDate : null,
+      ownerId: req.auth!.userId,
+    };
+  });
+
+  const inserted = await Project.insertMany(docsToInsert);
+  const populated = await Project.find({ _id: { $in: inserted.map((doc) => doc._id) } })
+    .populate("ownerId", "name email role")
+    .lean();
+
+  await recordAuditEvent({
+    actor: req.auth!,
+    action: "project.imported",
+    resourceType: "project",
+    resourceId: null,
+    summary: `Imported ${inserted.length} projects via file upload`,
+  });
+
+  res.status(201).json({
+    ok: true,
+    data: {
+      importedCount: populated.length,
+      projects: populated.map((project) =>
+        serializeProject(project as unknown as Parameters<typeof serializeProject>[0]),
+      ),
+    },
+  });
 }

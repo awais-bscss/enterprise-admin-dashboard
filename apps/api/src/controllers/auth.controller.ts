@@ -133,7 +133,9 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const existing = await RefreshToken.findOne({ tokenHash: hashToken(rawRefresh) });
+  const existing = await RefreshToken.findOne({ tokenHash: hashToken(rawRefresh) })
+    .select("_id userId familyId revokedAt expiresAt")
+    .lean();
   if (!existing) {
     clearAuthCookies(res);
     res.status(401).json({
@@ -157,9 +159,8 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if (existing.expiresAt.getTime() <= Date.now()) {
-    existing.revokedAt = new Date();
-    await existing.save();
+  if (new Date(existing.expiresAt).getTime() <= Date.now()) {
+    await RefreshToken.updateOne({ _id: existing._id }, { $set: { revokedAt: new Date() } });
     clearAuthCookies(res);
     res.status(401).json({
       ok: false,
@@ -168,7 +169,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const user = await User.findById(existing.userId);
+  const user = await User.findById(existing.userId).select("_id name email role status").lean();
   if (!user || user.status !== "active") {
     await RefreshToken.updateMany(
       { familyId: existing.familyId, revokedAt: null },
@@ -186,35 +187,36 @@ export async function refresh(req: Request, res: Response): Promise<void> {
   const nextHash = hashToken(nextRefresh);
   const nextCsrf = createCsrfToken();
 
-  existing.revokedAt = new Date();
-  existing.replacedByHash = nextHash;
-  await existing.save();
-
-  await RefreshToken.create({
-    userId: user._id,
-    tokenHash: nextHash,
-    familyId: existing.familyId,
-    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
-  });
+  await Promise.all([
+    RefreshToken.updateOne(
+      { _id: existing._id },
+      { $set: { revokedAt: new Date(), replacedByHash: nextHash } },
+    ),
+    RefreshToken.create({
+      userId: user._id,
+      tokenHash: nextHash,
+      familyId: existing.familyId,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    }),
+    recordAuditEvent({
+      actor: {
+        userId: String(user._id),
+        name: user.name,
+        email: user.email,
+        role: user.role as Role,
+      },
+      action: "auth.login",
+      resourceType: "auth",
+      resourceId: String(user._id),
+      summary: `Signed in as ${user.role}`,
+    }),
+  ]);
 
   setAuthCookies(res, nextRefresh, nextCsrf);
 
   const accessToken = signAccessToken({
     sub: String(user._id),
     role: user.role as Role,
-  });
-
-  await recordAuditEvent({
-    actor: {
-      userId: String(user._id),
-      name: user.name,
-      email: user.email,
-      role: user.role as Role,
-    },
-    action: "auth.login",
-    resourceType: "auth",
-    resourceId: String(user._id),
-    summary: `Signed in as ${user.role}`,
   });
 
   res.status(200).json({

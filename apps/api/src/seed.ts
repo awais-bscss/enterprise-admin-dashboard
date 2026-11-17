@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
+import { z } from "zod";
 import { env } from "./config/env.js";
 import { type Role } from "./config/rbac.js";
 import { AuditLog } from "./models/AuditLog.js";
@@ -14,33 +15,115 @@ interface SeedAccount {
   role: Role;
 }
 
-const SEED_ACCOUNTS: SeedAccount[] = [
-  {
-    name: "Admin User",
-    email: "admin@enterprise.dev",
-    password: "Admin@12345",
-    role: "admin",
-  },
-  {
-    name: "Operations Manager",
-    email: "manager@enterprise.dev",
-    password: "Manager@12345",
-    role: "manager",
-  },
-  {
-    name: "Read-Only Viewer",
-    email: "viewer@enterprise.dev",
-    password: "Viewer@12345",
-    role: "viewer",
-  },
-];
+const optionalSeedString = z
+  .string()
+  .trim()
+  .optional()
+  .transform((val) => (val && val.length > 0 ? val : undefined));
+
+const seedEnvSchema = z
+  .object({
+    SEED_ADMIN_NAME: optionalSeedString,
+    SEED_ADMIN_EMAIL: z.string().trim().email("SEED_ADMIN_EMAIL must be a valid email"),
+    SEED_ADMIN_PASSWORD: z
+      .string()
+      .min(8, "SEED_ADMIN_PASSWORD must be at least 8 characters"),
+    SEED_MANAGER_NAME: optionalSeedString,
+    SEED_MANAGER_EMAIL: optionalSeedString,
+    SEED_MANAGER_PASSWORD: z.string().optional(),
+    SEED_VIEWER_NAME: optionalSeedString,
+    SEED_VIEWER_EMAIL: optionalSeedString,
+    SEED_VIEWER_PASSWORD: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const optionalRoles: Array<{
+      prefix: string;
+      email?: string;
+      password?: string;
+    }> = [
+      {
+        prefix: "SEED_MANAGER",
+        email: data.SEED_MANAGER_EMAIL,
+        password: data.SEED_MANAGER_PASSWORD,
+      },
+      {
+        prefix: "SEED_VIEWER",
+        email: data.SEED_VIEWER_EMAIL,
+        password: data.SEED_VIEWER_PASSWORD,
+      },
+    ];
+
+    for (const entry of optionalRoles) {
+      const hasEmail = Boolean(entry.email);
+      const hasPassword = Boolean(entry.password && entry.password.length > 0);
+      if (hasEmail !== hasPassword) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Both ${entry.prefix}_EMAIL and ${entry.prefix}_PASSWORD are required together`,
+        });
+      }
+      if (hasEmail && entry.email && !z.string().email().safeParse(entry.email).success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${entry.prefix}_EMAIL must be a valid email`,
+        });
+      }
+      if (hasPassword && entry.password && entry.password.length < 8) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${entry.prefix}_PASSWORD must be at least 8 characters`,
+        });
+      }
+    }
+  });
+
+function resolveSeedAccounts(): SeedAccount[] {
+  const parsed = seedEnvSchema.safeParse(process.env);
+  if (!parsed.success) {
+    const details = parsed.error.issues.map((issue) => issue.message).join("; ");
+    throw new Error(
+      `Missing or invalid seed environment variables (${details}). Configure them in apps/api/.env before running seed.`,
+    );
+  }
+
+  const data = parsed.data;
+  const accounts: SeedAccount[] = [
+    {
+      name: data.SEED_ADMIN_NAME ?? "Workspace Admin",
+      email: data.SEED_ADMIN_EMAIL.toLowerCase(),
+      password: data.SEED_ADMIN_PASSWORD,
+      role: "admin",
+    },
+  ];
+
+  if (data.SEED_MANAGER_EMAIL && data.SEED_MANAGER_PASSWORD) {
+    accounts.push({
+      name: data.SEED_MANAGER_NAME ?? "Operations Manager",
+      email: data.SEED_MANAGER_EMAIL.toLowerCase(),
+      password: data.SEED_MANAGER_PASSWORD,
+      role: "manager",
+    });
+  }
+
+  if (data.SEED_VIEWER_EMAIL && data.SEED_VIEWER_PASSWORD) {
+    accounts.push({
+      name: data.SEED_VIEWER_NAME ?? "Workspace Viewer",
+      email: data.SEED_VIEWER_EMAIL.toLowerCase(),
+      password: data.SEED_VIEWER_PASSWORD,
+      role: "viewer",
+    });
+  }
+
+  return accounts;
+}
 
 async function seed(): Promise<void> {
+  const accounts = resolveSeedAccounts();
   await mongoose.connect(env.MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
 
-  const seededUsers = new Map<string, mongoose.Types.ObjectId>();
+  const seededUsers = new Map<Role, mongoose.Types.ObjectId>();
 
-  for (const account of SEED_ACCOUNTS) {
+  for (const account of accounts) {
     const passwordHash = await bcrypt.hash(account.password, 10);
     const userDoc = await User.findOneAndUpdate(
       { email: account.email },
@@ -56,6 +139,10 @@ async function seed(): Promise<void> {
     seededUsers.set(account.role, userDoc._id);
   }
 
+  const adminAccount = accounts[0]!;
+  const adminId = seededUsers.get("admin")!;
+  const managerId = seededUsers.get("manager") ?? adminId;
+
   await WorkspaceSetting.findOneAndUpdate(
     { key: "default" },
     { $setOnInsert: { key: "default", organizationName: "Veridian Enterprise" } },
@@ -64,8 +151,6 @@ async function seed(): Promise<void> {
 
   const existingProjects = await Project.countDocuments();
   if (existingProjects === 0) {
-    const adminId = seededUsers.get("admin")!;
-    const managerId = seededUsers.get("manager")!;
 
     await Project.insertMany([
       {
@@ -133,14 +218,13 @@ async function seed(): Promise<void> {
 
   const existingLogs = await AuditLog.countDocuments();
   if (existingLogs === 0) {
-    const adminId = seededUsers.get("admin")!;
     const dayMs = 24 * 60 * 60 * 1000;
     const now = Date.now();
     await AuditLog.insertMany([
       {
         actorId: adminId,
-        actorName: "Admin User",
-        actorEmail: "admin@enterprise.dev",
+        actorName: adminAccount.name,
+        actorEmail: adminAccount.email,
         actorRole: "admin",
         action: "auth.login",
         resourceType: "auth",
@@ -150,8 +234,8 @@ async function seed(): Promise<void> {
       },
       {
         actorId: adminId,
-        actorName: "Admin User",
-        actorEmail: "admin@enterprise.dev",
+        actorName: adminAccount.name,
+        actorEmail: adminAccount.email,
         actorRole: "admin",
         action: "project.created",
         resourceType: "project",
@@ -161,8 +245,8 @@ async function seed(): Promise<void> {
       },
       {
         actorId: adminId,
-        actorName: "Admin User",
-        actorEmail: "admin@enterprise.dev",
+        actorName: adminAccount.name,
+        actorEmail: adminAccount.email,
         actorRole: "admin",
         action: "settings.updated",
         resourceType: "settings",
@@ -173,7 +257,7 @@ async function seed(): Promise<void> {
     ]);
   }
 
-  console.log(`Seeded ${SEED_ACCOUNTS.length} enterprise accounts and baseline projects.`);
+  console.log(`Seeded ${accounts.length} enterprise accounts and baseline projects.`);
   await mongoose.disconnect();
 }
 
