@@ -11,6 +11,7 @@ import {
 } from './fixtures';
 
 export const defaultHandlers = [
+  http.get('*/api/health', () => HttpResponse.json({ ok: true, db: 'connected' })),
   http.post('*/api/auth/login', () =>
     HttpResponse.json({
       ok: true,

@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { preloadRoute } from '../app/routePreload';
 import { useToast } from '../components/toast/toastContext';
+import { api } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import { validateEmail, validatePasswordMin } from '../lib/validation';
 import { useAuth } from '../features/auth/authContext';
@@ -63,6 +64,17 @@ function getQuickAccounts(): DevQuickAccount[] {
     }));
 }
 
+const WARM_UP_COOLDOWN_MS = 60_000;
+let lastWarmUpAt = 0;
+
+function warmAuthBackend(): void {
+  if (import.meta.env.MODE === 'test') return;
+  const now = Date.now();
+  if (now - lastWarmUpAt < WARM_UP_COOLDOWN_MS) return;
+  lastWarmUpAt = now;
+  void api.get('/health', { params: { warm: 1 }, skipAuth: true, retry: 0 }).catch(() => undefined);
+}
+
 export function useLoginForm() {
   const { user, status, login, sessionNotice, clearSessionNotice } = useAuth();
   const navigate = useNavigate();
@@ -80,6 +92,11 @@ export function useLoginForm() {
   const redirectTarget =
     status === 'authenticated' ? resolveLoginDestination(user, requestedPath) : null;
 
+  useEffect(() => {
+    if (status === 'authenticated') return;
+    warmAuthBackend();
+  }, [status]);
+
   function validateForm(): string | null {
     return (
       validateEmail(email) ??
@@ -92,6 +109,7 @@ export function useLoginForm() {
     setPassword(account.password);
     setError(null);
     clearSessionNotice();
+    preloadRoute(requestedPath ?? '/dashboard');
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -106,11 +124,15 @@ export function useLoginForm() {
 
     setSubmitting(true);
     setError(null);
+    // Start fetching destination route chunk in parallel with the auth request.
+    preloadRoute(requestedPath ?? '/dashboard');
 
     try {
       const authenticatedUser = await login(email.trim(), password);
       const destination = resolveLoginDestination(authenticatedUser, requestedPath);
-      preloadRoute(destination);
+      if (destination !== (requestedPath ?? '/dashboard')) {
+        preloadRoute(destination);
+      }
       toast.success(`Signed in as ${authenticatedUser.name}.`);
       navigate(destination, { replace: true });
     } catch (err) {

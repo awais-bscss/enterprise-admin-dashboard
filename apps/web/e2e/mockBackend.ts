@@ -109,6 +109,15 @@ export async function installMockBackend(
       return;
     }
 
+    if (pathname === '/api/health' && method === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, db: 'connected' }),
+      });
+      return;
+    }
+
     if (pathname === '/api/auth/login' && method === 'POST') {
       const body = request.postDataJSON() as { email?: string; password?: string };
       if (body.password === 'WrongPass1!') {
