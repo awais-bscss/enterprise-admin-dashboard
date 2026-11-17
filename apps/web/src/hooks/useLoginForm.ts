@@ -21,9 +21,7 @@ export interface DevQuickAccount {
   password: string;
 }
 
-function getDevQuickAccounts(): DevQuickAccount[] {
-  if (!import.meta.env.DEV) return [];
-
+function getQuickAccounts(): DevQuickAccount[] {
   const definitions: Array<{
     role: DevQuickAccount['role'];
     label: string;
@@ -77,7 +75,7 @@ export function useLoginForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const quickAccounts = getDevQuickAccounts();
+  const quickAccounts = getQuickAccounts();
   const requestedPath = (location.state as LocationState | null)?.from?.pathname;
   const redirectTarget =
     status === 'authenticated' ? resolveLoginDestination(user, requestedPath) : null;

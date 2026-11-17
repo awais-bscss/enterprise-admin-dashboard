@@ -127,10 +127,10 @@ export function LoginPage() {
         {quickAccounts.length > 0 ? (
           <div
             className="mt-6 w-full border-t border-slate-300/75 pt-5"
-            aria-label="Quick dev role accounts"
+            aria-label="Quick role accounts"
           >
             <p className="mb-3 text-center text-[10px] font-semibold tracking-[0.16em] text-slate-600 uppercase">
-              Quick fill dev accounts
+              Quick fill demo accounts
             </p>
             <div className="grid w-full grid-cols-1 gap-2.5 sm:grid-cols-3">
               {quickAccounts.map((account) => (

@@ -103,7 +103,7 @@ Configured on `/(.*)` in [`apps/web/vercel.json`](../../apps/web/vercel.json):
 
 - Root [`.gitignore`](../../.gitignore) excludes `.env` and `.env.*` while preserving `.env.example` templates.
 - [`apps/api/src/seed.ts`](../../apps/api/src/seed.ts) reads initial account credentials strictly from `process.env` via Zod (`SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, and optional manager/viewer env pairs) rather than embedded sample credentials.
-- Frontend sign-in and user creation forms (`LoginPage.tsx`, `UserFormModal.tsx`) contain zero hardcoded demo passwords or sample credentials; optional quick-role autofill buttons on `LoginPage.tsx` render only under `import.meta.env.DEV` when gitignored `VITE_DEV_*` variables are configured locally and are excluded from production builds.
+- Frontend sign-in and user creation forms (`LoginPage.tsx`, `UserFormModal.tsx`) contain zero hardcoded demo passwords or sample credentials; optional quick-role autofill buttons on `LoginPage.tsx` render only when `VITE_DEV_*` variables are explicitly configured in gitignored `.env.development` or deployment environment settings.
 
 ---
 
