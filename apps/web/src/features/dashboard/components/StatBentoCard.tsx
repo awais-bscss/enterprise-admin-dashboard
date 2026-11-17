@@ -30,27 +30,29 @@ export function StatBentoCard({
 
   return (
     <article className={`${SURFACE_TOKENS.cardInteractive} flex flex-col justify-between p-5`}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
-            className={`flex h-11 w-11 items-center justify-center rounded-full ring-4 ${styles.ring} ${styles.iconBg} ${styles.iconText}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ${styles.ring} ${styles.iconBg} ${styles.iconText}`}
           >
-            <Icon className="h-5 w-5" />
+            <Icon className="h-4 w-4" />
           </div>
-          <h2 className="text-sm font-medium text-slate-600">{title}</h2>
+          <h2 className="text-sm font-medium text-slate-600 dark:text-slate-300">{title}</h2>
         </div>
 
         <Link
           to={to}
           aria-label={`Open ${title}`}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100/80 text-slate-600 transition hover:bg-sky-50 hover:text-sky-700"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100/80 text-slate-600 transition hover:bg-sky-50 hover:text-sky-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-sky-500/20 dark:hover:text-sky-300"
         >
           <ArrowUpRight className="h-4 w-4" />
         </Link>
       </div>
 
       <div className="my-5 flex items-baseline gap-2.5">
-        <p className="tabular-nums text-3xl font-bold tracking-tight text-slate-900">{value}</p>
+        <p className="tabular-nums text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          {value}
+        </p>
         {delta ? (
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-semibold ${styles.badgeBg} ${styles.badgeText}`}
@@ -60,7 +62,7 @@ export function StatBentoCard({
         ) : null}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3.5">
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3.5 dark:border-slate-800">
         <span className="text-xs font-medium text-slate-400">{footerLabel}</span>
         {rightSlot}
       </div>

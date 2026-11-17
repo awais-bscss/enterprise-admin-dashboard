@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getErrorMessage, isAbortError } from '../../lib/errors';
-import type { DashboardOverviewData, Permission } from '../../types/auth';
-import { getDashboardOverview } from './dashboardApi';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useToast } from '../components/toast/toastContext';
+import { getErrorMessage } from '../lib/errors';
+import { queryKeys } from '../lib/queryKeys';
+import { dashboardService } from '../services/apiService';
+import type { Permission } from '../types/auth';
 
 export interface ModuleCardConfig {
   permission: Permission;
@@ -43,39 +46,22 @@ export const RBAC_MODULES: readonly ModuleCardConfig[] = [
 ];
 
 export function useDashboardOverview() {
-  const [overview, setOverview] = useState<DashboardOverviewData | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    getDashboardOverview(controller.signal)
-      .then((data) => {
-        setOverview(data);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (isAbortError(err)) return;
-        setError(getErrorMessage(err, 'Unable to load overview'));
-      });
-
-    return () => controller.abort();
-  }, []);
+  const { data, error, isFetching, refetch } = useQuery({
+    queryKey: queryKeys.dashboard,
+    queryFn: ({ signal }) => dashboardService.getOverview(signal),
+  });
 
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const data = await getDashboardOverview();
-      setOverview(data);
-      setError(null);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Unable to load overview'));
-    } finally {
-      setRefreshing(false);
+    const result = await refetch();
+    if (result.error) {
+      toast.error(getErrorMessage(result.error, 'Unable to refresh overview.'));
+      return;
     }
-  }, []);
+    toast.info('Dashboard metrics refreshed.');
+  }, [refetch, toast]);
 
   const filteredModules = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -88,6 +74,7 @@ export function useDashboardOverview() {
     );
   }, [searchQuery]);
 
+  const overview = data ?? null;
   const totalProjects = overview?.stats.totalProjects ?? 0;
   const activeProjects = overview?.stats.activeProjects ?? 0;
   const totalTasks = overview?.stats.totalTasks ?? 0;
@@ -97,8 +84,8 @@ export function useDashboardOverview() {
 
   return {
     overview,
-    refreshing,
-    error,
+    refreshing: isFetching,
+    error: error ? getErrorMessage(error, 'Unable to load overview') : null,
     searchQuery,
     setSearchQuery,
     filteredModules,

@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { preloadRoute } from '../../app/routePreload';
+import { useToast } from '../../components/toast/toastContext';
 import { setAccessToken, setSessionExpiredHandler } from '../../lib/api';
 import { getCookie } from '../../lib/cookies';
+import { queryClient } from '../../lib/queryClient';
+import { authService } from '../../services/apiService';
 import type { AuthSessionData, AuthUser, Permission, Role } from '../../types/auth';
-import {
-  loginRequest,
-  logoutRequest,
-  refreshSessionRequest,
-  updateProfileRequest,
-} from './authApi';
 import { AuthContext, type AuthStatus } from './authContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  const toast = useToast();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>(() =>
     getCookie('csrf_token') ? 'loading' : 'unauthenticated',
@@ -32,22 +33,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setExpiresAt(null);
     setStatus('unauthenticated');
     setSessionNotice(notice);
+    queryClient.clear();
   }, []);
 
   useEffect(() => {
     setSessionExpiredHandler(() => {
-      clearSession('Your session expired. Please sign in again.');
+      const expiredMessage = 'Your session expired. Please sign in again.';
+      clearSession(expiredMessage);
+      toast.error(expiredMessage);
     });
 
     return () => setSessionExpiredHandler(null);
-  }, [clearSession]);
+  }, [clearSession, toast]);
 
   useEffect(() => {
     if (!getCookie('csrf_token')) return;
 
+    preloadRoute(window.location.pathname);
+    preloadRoute('/dashboard');
+
     let active = true;
 
-    refreshSessionRequest()
+    authService
+      .refresh()
       .then((session) => {
         if (!active) return;
         if (session) {
@@ -72,39 +80,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshDelay = Math.max(expiresAt - Date.now() - 60_000, 15_000);
     const timer = window.setTimeout(async () => {
       try {
-        const session = await refreshSessionRequest();
+        const session = await authService.refresh();
         if (session) {
           applySession(session);
         } else {
-          clearSession('Your session expired. Please sign in again.');
+          const message = 'Your session expired. Please sign in again.';
+          clearSession(message);
+          toast.error(message);
         }
       } catch {
-        clearSession('Your session expired. Please sign in again.');
+        const message = 'Your session expired. Please sign in again.';
+        clearSession(message);
+        toast.error(message);
       }
     }, refreshDelay);
 
     return () => window.clearTimeout(timer);
-  }, [status, expiresAt, applySession, clearSession]);
+  }, [status, expiresAt, applySession, clearSession, toast]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const session = await loginRequest(email, password);
+    async (email: string, password: string): Promise<AuthUser> => {
+      const session = await authService.login(email, password);
+      queryClient.clear();
       applySession(session);
+      return session.user;
     },
     [applySession],
   );
 
   const logout = useCallback(async () => {
     try {
-      await logoutRequest();
+      await authService.logout();
     } finally {
       clearSession();
+      toast.info('Signed out successfully.');
+      navigate('/login', { replace: true, state: null });
     }
-  }, [clearSession]);
+  }, [clearSession, navigate, toast]);
 
   const updateProfile = useCallback(
     async (payload: { name?: string; currentPassword?: string; newPassword?: string }) => {
-      const updatedUser = await updateProfileRequest(payload);
+      const updatedUser = await authService.updateProfile(payload);
       setUser(updatedUser);
     },
     [],
@@ -124,22 +140,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        status,
-        sessionNotice,
-        expiresAt,
-        login,
-        logout,
-        updateProfile,
-        clearSessionNotice,
-        hasRole,
-        hasPermission,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      status,
+      sessionNotice,
+      expiresAt,
+      login,
+      logout,
+      updateProfile,
+      clearSessionNotice,
+      hasRole,
+      hasPermission,
+    }),
+    [
+      user,
+      status,
+      sessionNotice,
+      expiresAt,
+      login,
+      logout,
+      updateProfile,
+      clearSessionNotice,
+      hasRole,
+      hasPermission,
+    ],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

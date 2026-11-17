@@ -8,7 +8,7 @@ export interface AuthContextValue {
   status: AuthStatus;
   sessionNotice: string | null;
   expiresAt: number | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   updateProfile: (payload: {
     name?: string;

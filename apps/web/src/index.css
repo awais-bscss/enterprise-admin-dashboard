@@ -1,13 +1,22 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  color-scheme: light;
   --surface-canvas: #f5f7fa;
   --surface-card: #ffffff;
   --surface-subtle: #f8fafc;
   --text-primary: #0f172a;
   --text-muted: #64748b;
-  --border-card: rgba(226, 232, 240, 0.7);
-  --border-modal: rgba(226, 232, 240, 0.8);
+  --border-card: rgba(226, 232, 240, 0.75);
+  --border-modal: rgba(226, 232, 240, 0.85);
+
+  --brand-primary: #0369a1;
+  --brand-primary-hover: #075985;
+  --brand-primary-soft: #e0f2fe;
+  --brand-primary-soft-hover: #bae6fd;
+  --brand-primary-ink: #0c4a6e;
+  --brand-primary-border: rgba(125, 211, 252, 0.85);
 
   --radius-card: 1.5rem;
   --radius-panel: 1.375rem;
@@ -18,10 +27,37 @@
   --shadow-sidebar: 4px 0 24px -14px rgba(15, 23, 42, 0.07);
 }
 
+:root.dark {
+  color-scheme: dark;
+  --surface-canvas: #0b1220;
+  --surface-card: #111b2e;
+  --surface-subtle: #1a253b;
+  --text-primary: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-card: rgba(71, 85, 105, 0.55);
+  --border-modal: rgba(71, 85, 105, 0.75);
+
+  --brand-primary: #0284c7;
+  --brand-primary-hover: #0369a1;
+  --brand-primary-soft: rgba(14, 165, 233, 0.2);
+  --brand-primary-soft-hover: rgba(14, 165, 233, 0.3);
+  --brand-primary-ink: #e0f2fe;
+  --brand-primary-border: rgba(14, 165, 233, 0.4);
+
+  --shadow-bento: 0 10px 30px -10px rgba(2, 6, 23, 0.65), 0 1px 3px 0 rgba(2, 6, 23, 0.4);
+  --shadow-sidebar: 4px 0 24px -14px rgba(2, 6, 23, 0.55);
+}
+
 @theme {
   --color-canvas: var(--surface-canvas);
   --color-surface: var(--surface-card);
   --color-surface-subtle: var(--surface-subtle);
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: var(--brand-primary-hover);
+  --color-primary-soft: var(--brand-primary-soft);
+  --color-primary-soft-hover: var(--brand-primary-soft-hover);
+  --color-primary-ink: var(--brand-primary-ink);
+  --color-primary-border: var(--brand-primary-border);
   --radius-bento: var(--radius-card);
   --radius-panel: var(--radius-panel);
   --radius-modal: var(--radius-modal);
@@ -35,6 +71,7 @@
     color: var(--text-primary);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
+    transition: background-color 150ms ease, color 150ms ease;
   }
 }
 

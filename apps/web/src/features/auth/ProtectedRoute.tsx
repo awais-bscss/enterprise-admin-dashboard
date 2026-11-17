@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { LoaderCircle } from 'lucide-react';
+import { WorkspaceLoader } from '../../components/WorkspaceLoader';
 import type { Permission, Role } from '../../types/auth';
 import { useAuth } from './authContext';
 
@@ -15,18 +15,7 @@ export function ProtectedRoute({ children, roles, permission }: ProtectedRoutePr
   const location = useLocation();
 
   if (status === 'loading') {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f5f7fa] px-4 py-12">
-        <section
-          className="bento-shadow flex items-center gap-3 rounded-[24px] border border-slate-200/70 bg-white px-6 py-5"
-          aria-busy="true"
-          aria-live="polite"
-        >
-          <LoaderCircle className="h-5 w-5 animate-spin text-sky-600" />
-          <p className="text-sm font-medium text-slate-600">Verifying workspace session...</p>
-        </section>
-      </main>
-    );
+    return <WorkspaceLoader />;
   }
 
   if (status !== 'authenticated') {
