@@ -1,17 +1,33 @@
-import { useEffect, useState, type FormEvent } from 'react';
 import { AlertCircle, FolderPlus, X } from 'lucide-react';
-import { getErrorMessage } from '../../lib/errors';
-import { validateMinLength } from '../../lib/validation';
-import { SURFACE_TOKENS } from '../../theme/tokens';
+import { AppDropdown, type DropdownOption } from '../../components/AppDropdown';
+import { BUTTON_TOKENS, SURFACE_TOKENS } from '../../theme/tokens';
 import type {
-  DirectoryPreviewUser,
   ProjectCategory,
   ProjectItem,
   ProjectPriority,
   ProjectStatus,
 } from '../../types/auth';
-import { listUsers } from '../directory/usersApi';
-import { createProject, updateProject } from './projectsApi';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { useProjectForm } from '../../hooks/useProjectForm';
+
+const CATEGORY_OPTIONS: readonly DropdownOption<ProjectCategory>[] = [
+  { value: 'development', label: 'Development' },
+  { value: 'design', label: 'Design' },
+  { value: 'testing', label: 'Testing' },
+  { value: 'security', label: 'Security' },
+];
+
+const STATUS_OPTIONS: readonly DropdownOption<ProjectStatus>[] = [
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+];
+
+const PRIORITY_OPTIONS: readonly DropdownOption<ProjectPriority>[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
 
 interface ProjectFormModalProps {
   project?: ProjectItem | null;
@@ -20,79 +36,33 @@ interface ProjectFormModalProps {
 }
 
 export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModalProps) {
-  const isEditing = Boolean(project);
-
-  const [name, setName] = useState(project?.name ?? '');
-  const [description, setDescription] = useState(project?.description ?? '');
-  const [category, setCategory] = useState<ProjectCategory>(project?.category ?? 'development');
-  const [status, setStatus] = useState<ProjectStatus>(project?.status ?? 'in_progress');
-  const [priority, setPriority] = useState<ProjectPriority>(project?.priority ?? 'medium');
-  const [tasksTotal, setTasksTotal] = useState(String(project?.tasksTotal ?? 10));
-  const [tasksCompleted, setTasksCompleted] = useState(String(project?.tasksCompleted ?? 0));
-  const [ownerId, setOwnerId] = useState(project?.owner.id ?? '');
-  const [teamMembers, setTeamMembers] = useState<DirectoryPreviewUser[]>([]);
-  const [dueDate, setDueDate] = useState(
-    project?.dueDate ? project.dueDate.slice(0, 10) : '',
-  );
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    listUsers({ status: 'active', signal: controller.signal })
-      .then((res) => setTeamMembers(res.users))
-      .catch(() => undefined);
-    return () => controller.abort();
-  }, []);
-
-  const parsedTotal = Math.max(1, Number(tasksTotal) || 1);
-  const parsedDone =
-    status === 'completed'
-      ? parsedTotal
-      : Math.min(Math.max(0, Number(tasksCompleted) || 0), parsedTotal);
-  const previewProgress =
-    status === 'completed' ? 100 : Math.round((parsedDone / parsedTotal) * 100);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = name.trim();
-    const validationError = validateMinLength(
-      trimmed,
-      2,
-      'Project name must be at least 2 characters.',
-    );
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const payload = {
-        name: trimmed,
-        description: description.trim(),
-        category,
-        status,
-        priority,
-        tasksTotal: parsedTotal,
-        tasksCompleted: parsedDone,
-        ...(ownerId ? { ownerId } : {}),
-        dueDate: dueDate || null,
-      };
-
-      const saved = project
-        ? await updateProject(project.id, payload)
-        : await createProject(payload);
-
-      onSaved(saved);
-    } catch (err) {
-      setError(getErrorMessage(err, 'Unable to save project.'));
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  useModalScrollLock(true);
+  const {
+    isEditing,
+    name,
+    setName,
+    description,
+    setDescription,
+    category,
+    setCategory,
+    status,
+    setStatus,
+    priority,
+    setPriority,
+    tasksTotal,
+    setTasksTotal,
+    tasksCompleted,
+    setTasksCompleted,
+    ownerId,
+    setOwnerId,
+    dueDate,
+    setDueDate,
+    teamMembers,
+    parsedTotal,
+    submitting,
+    error,
+    handleSubmit,
+  } = useProjectForm(project, onSaved);
 
   return (
     <div
@@ -102,17 +72,22 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
       aria-labelledby="project-modal-title"
     >
       <div className={`${SURFACE_TOKENS.modalCard} max-w-lg`}>
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-700 ring-1 ring-sky-100">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-700 ring-1 ring-sky-100 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/30">
               <FolderPlus className="h-4 w-4" />
             </span>
             <div>
-              <h2 id="project-modal-title" className="text-base font-bold text-slate-900">
+              <h2
+                id="project-modal-title"
+                className="text-base font-bold text-slate-900 dark:text-slate-100"
+              >
                 {isEditing ? 'Edit Project' : 'Create New Project'}
               </h2>
               <p className="text-xs text-slate-400">
-                {isEditing ? 'Update progress, tasks, and delivery status.' : 'Add a tracked initiative to the workspace.'}
+                {isEditing
+                  ? 'Update progress, tasks, and delivery status.'
+                  : 'Add a tracked initiative to the workspace.'}
               </p>
             </div>
           </div>
@@ -121,7 +96,7 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
             <X className="h-4 w-4" />
           </button>
@@ -129,17 +104,20 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
 
         {error ? (
           <div
-            className="mt-4 flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-800"
+            className={`mt-4 flex items-center gap-2 text-xs font-medium ${BUTTON_TOKENS.alertError}`}
             role="alert"
           >
-            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
             <span>{error}</span>
           </div>
         ) : null}
 
         <form className="mt-4 space-y-4" onSubmit={(e) => void handleSubmit(e)}>
           <div>
-            <label htmlFor="proj-name" className="block text-xs font-semibold text-slate-700">
+            <label
+              htmlFor="proj-name"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+            >
               Project Name
             </label>
             <input
@@ -149,12 +127,15 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Enterprise Billing v2"
-              className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100 focus:outline-none"
+              className={`mt-1.5 ${SURFACE_TOKENS.input}`}
             />
           </div>
 
           <div>
-            <label htmlFor="proj-desc" className="block text-xs font-semibold text-slate-700">
+            <label
+              htmlFor="proj-desc"
+              className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+            >
               Description
             </label>
             <textarea
@@ -163,64 +144,69 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Short scope or milestone summary..."
-              className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100 focus:outline-none"
+              className={`mt-1.5 py-2 ${SURFACE_TOKENS.input}`}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label htmlFor="proj-cat" className="block text-xs font-semibold text-slate-700">
+              <label
+                htmlFor="proj-cat"
+                className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
                 Track
               </label>
-              <select
+              <AppDropdown<ProjectCategory>
                 id="proj-cat"
+                variant="field"
                 value={category}
-                onChange={(e) => setCategory(e.target.value as ProjectCategory)}
-                className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:outline-none"
-              >
-                <option value="development">Development</option>
-                <option value="design">Design</option>
-                <option value="testing">Testing</option>
-                <option value="security">Security</option>
-              </select>
+                options={CATEGORY_OPTIONS}
+                onChange={setCategory}
+                ariaLabel="Track"
+              />
             </div>
 
             <div>
-              <label htmlFor="proj-status" className="block text-xs font-semibold text-slate-700">
+              <label
+                htmlFor="proj-status"
+                className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
                 Status
               </label>
-              <select
+              <AppDropdown<ProjectStatus>
                 id="proj-status"
+                variant="field"
                 value={status}
-                onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-                className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:outline-none"
-              >
-                <option value="upcoming">Upcoming</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
+                options={STATUS_OPTIONS}
+                onChange={setStatus}
+                ariaLabel="Status"
+              />
             </div>
 
             <div>
-              <label htmlFor="proj-priority" className="block text-xs font-semibold text-slate-700">
+              <label
+                htmlFor="proj-priority"
+                className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
                 Priority
               </label>
-              <select
+              <AppDropdown<ProjectPriority>
                 id="proj-priority"
+                variant="field"
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as ProjectPriority)}
-                className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:outline-none"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
+                options={PRIORITY_OPTIONS}
+                onChange={setPriority}
+                ariaLabel="Priority"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label htmlFor="proj-total" className="block text-xs font-semibold text-slate-700">
+              <label
+                htmlFor="proj-total"
+                className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
                 Total Tasks
               </label>
               <input
@@ -230,12 +216,15 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
                 max={1000}
                 value={tasksTotal}
                 onChange={(e) => setTasksTotal(e.target.value)}
-                className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:outline-none"
+                className={`mt-1.5 py-2 ${SURFACE_TOKENS.input}`}
               />
             </div>
 
             <div>
-              <label htmlFor="proj-done" className="block text-xs font-semibold text-slate-700">
+              <label
+                htmlFor="proj-done"
+                className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
                 Completed Tasks
               </label>
               <input
@@ -246,12 +235,15 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
                 value={status === 'completed' ? String(parsedTotal) : tasksCompleted}
                 onChange={(e) => setTasksCompleted(e.target.value)}
                 disabled={status === 'completed'}
-                className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:outline-none disabled:opacity-60"
+                className={`mt-1.5 py-2 ${SURFACE_TOKENS.input} disabled:opacity-60`}
               />
             </div>
 
             <div>
-              <label htmlFor="proj-due" className="block text-xs font-semibold text-slate-700">
+              <label
+                htmlFor="proj-due"
+                className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
                 Target Date
               </label>
               <input
@@ -259,57 +251,44 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:outline-none"
+                className={`mt-1.5 py-2 ${SURFACE_TOKENS.input}`}
               />
             </div>
           </div>
 
           {teamMembers.length > 0 ? (
             <div>
-              <label htmlFor="proj-owner" className="block text-xs font-semibold text-slate-700">
+              <label
+                htmlFor="proj-owner"
+                className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
                 Project Owner
               </label>
-              <select
+              <AppDropdown
                 id="proj-owner"
+                variant="field"
                 value={ownerId}
-                onChange={(e) => setOwnerId(e.target.value)}
-                className="mt-1.5 block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:border-sky-300 focus:bg-white focus:outline-none"
-              >
-                <option value="">Assign to current user</option>
-                {teamMembers.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name} ({member.role})
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'Assign to current user' },
+                  ...teamMembers.map((member) => ({
+                    value: member.id,
+                    label: `${member.name} (${member.role})`,
+                  })),
+                ]}
+                onChange={setOwnerId}
+                ariaLabel="Project Owner"
+              />
             </div>
           ) : null}
 
-          <div className="rounded-2xl bg-slate-50/80 p-3">
-            <div className="mb-1.5 flex items-center justify-between text-xs">
-              <span className="font-medium text-slate-500">Calculated Completion</span>
-              <span className="tabular-nums font-bold text-slate-800">{previewProgress}%</span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/70">
-              <div
-                className="h-full rounded-full bg-emerald-300 transition-all"
-                style={{ width: `${previewProgress}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
+          <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <button type="button" onClick={onClose} className={BUTTON_TOKENS.secondaryPill}>
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="cursor-pointer rounded-full border border-sky-200/90 bg-sky-100/90 px-5 py-2 text-xs font-semibold text-sky-900 transition hover:bg-sky-200/80 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`${BUTTON_TOKENS.primarySoftPill} px-5`}
             >
               {submitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Project'}
             </button>

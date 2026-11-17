@@ -105,6 +105,13 @@ export interface UsersDirectoryStats {
   viewers: number;
 }
 
+export interface ProjectsWorkspaceStats {
+  total: number;
+  completed: number;
+  inProgress: number;
+  upcoming: number;
+}
+
 export interface AuditLogItem {
   id: string;
   actorName: string;

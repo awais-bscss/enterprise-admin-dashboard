@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Code2, Palette, ShieldCheck, TestTube2 } from 'lucide-react';
 import {
   Bar,
@@ -9,8 +10,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useTheme } from '../../../theme/themeContext';
+import { CHART_SERIES_TOKENS, getChartPalette, SURFACE_TOKENS } from '../../../theme/tokens';
 import type { CategoryProgressItem, ProjectCategory } from '../../../types/auth';
-import { CHART_TOKENS, SURFACE_TOKENS } from '../../../theme/tokens';
 
 interface AccessCoverageChartCardProps {
   averageProgress: number;
@@ -38,27 +40,31 @@ const CATEGORY_VISUALS: Record<
 > = {
   development: {
     patternId: 'url(#pastelHatchRose)',
-    stroke: CHART_TOKENS.series.rose.border,
+    stroke: CHART_SERIES_TOKENS.rose.border,
     icon: Code2,
-    badgeClass: 'bg-rose-50 text-rose-600 ring-1 ring-rose-100',
+    badgeClass:
+      'bg-rose-50 text-rose-600 ring-1 ring-rose-100 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/30',
   },
   design: {
     patternId: 'url(#pastelHatchSky)',
-    stroke: CHART_TOKENS.series.sky.border,
+    stroke: CHART_SERIES_TOKENS.sky.border,
     icon: Palette,
-    badgeClass: 'bg-sky-50 text-sky-600 ring-1 ring-sky-100',
+    badgeClass:
+      'bg-sky-50 text-sky-600 ring-1 ring-sky-100 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/30',
   },
   testing: {
     patternId: 'url(#pastelHatchMint)',
-    stroke: CHART_TOKENS.series.mint.border,
+    stroke: CHART_SERIES_TOKENS.mint.border,
     icon: TestTube2,
-    badgeClass: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
+    badgeClass:
+      'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30',
   },
   security: {
     patternId: 'url(#pastelHatchViolet)',
-    stroke: CHART_TOKENS.series.violet.border,
+    stroke: CHART_SERIES_TOKENS.violet.border,
     icon: ShieldCheck,
-    badgeClass: 'bg-violet-50 text-violet-600 ring-1 ring-violet-100',
+    badgeClass:
+      'bg-violet-50 text-violet-600 ring-1 ring-violet-100 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/30',
   },
 };
 
@@ -72,20 +78,23 @@ function CoverageTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !item?.payload) return null;
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs shadow-sm">
-      <p className="font-semibold text-slate-800">{item.payload.label}</p>
-      <p className="mt-0.5 text-slate-500">
+    <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-950">
+      <p className="font-semibold text-slate-800 dark:text-slate-100">{item.payload.label}</p>
+      <p className="mt-0.5 text-slate-500 dark:text-slate-400">
         Avg Progress: {item.value}% ({item.payload.projectCount} projects)
       </p>
     </div>
   );
 }
 
-export function AccessCoverageChartCard({
+export const AccessCoverageChartCard = memo(function AccessCoverageChartCard({
   averageProgress,
   totalProjects,
   categoryProgress,
 }: AccessCoverageChartCardProps) {
+  const { isDark } = useTheme();
+  const chart = getChartPalette(isDark);
+
   const data: BarDatum[] = categoryProgress.map((item) => {
     const visual = CATEGORY_VISUALS[item.category];
     return {
@@ -102,8 +111,10 @@ export function AccessCoverageChartCard({
     <article className={`${SURFACE_TOKENS.card} flex flex-col justify-between p-5`}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Track Progress</h2>
-          <p className="tabular-nums mt-2 text-4xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            Track Progress
+          </h2>
+          <p className="tabular-nums mt-2 text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             {averageProgress}%
           </p>
           <p className="mt-1 text-xs text-slate-400">
@@ -111,7 +122,7 @@ export function AccessCoverageChartCard({
           </p>
         </div>
 
-        <ul className="space-y-2" aria-label="Track progress summary">
+        <ul className="min-h-[116px] space-y-2" aria-label="Track progress summary">
           {data.slice(0, 3).map((item) => {
             const visual = CATEGORY_VISUALS[item.key];
             const Icon = visual.icon;
@@ -124,7 +135,9 @@ export function AccessCoverageChartCard({
                 </span>
                 <div className="leading-tight">
                   <p className="text-[11px] font-medium text-slate-400">{item.label}</p>
-                  <p className="tabular-nums text-xs font-bold text-slate-800">{item.score}%</p>
+                  <p className="tabular-nums text-xs font-bold text-slate-800 dark:text-slate-100">
+                    {item.score}%
+                  </p>
                 </div>
               </li>
             );
@@ -134,7 +147,11 @@ export function AccessCoverageChartCard({
 
       <div className="mt-4 h-44 w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 20, right: 4, left: 4, bottom: 0 }} barCategoryGap={14}>
+          <BarChart
+            data={data}
+            margin={{ top: 20, right: 4, left: 4, bottom: 0 }}
+            barCategoryGap={14}
+          >
             <defs>
               <pattern
                 id="pastelHatchRose"
@@ -143,13 +160,13 @@ export function AccessCoverageChartCard({
                 patternUnits="userSpaceOnUse"
                 patternTransform="rotate(45)"
               >
-                <rect width="8" height="8" fill={CHART_TOKENS.series.rose.hatchBase} />
+                <rect width="8" height="8" fill={chart.series.rose.hatchBase} />
                 <line
                   x1="0"
                   y1="0"
                   x2="0"
                   y2="8"
-                  stroke={CHART_TOKENS.series.rose.hatchLine}
+                  stroke={chart.series.rose.hatchLine}
                   strokeOpacity="0.3"
                   strokeWidth="2.5"
                 />
@@ -161,13 +178,13 @@ export function AccessCoverageChartCard({
                 patternUnits="userSpaceOnUse"
                 patternTransform="rotate(45)"
               >
-                <rect width="8" height="8" fill={CHART_TOKENS.series.sky.hatchBase} />
+                <rect width="8" height="8" fill={chart.series.sky.hatchBase} />
                 <line
                   x1="0"
                   y1="0"
                   x2="0"
                   y2="8"
-                  stroke={CHART_TOKENS.series.sky.hatchLine}
+                  stroke={chart.series.sky.hatchLine}
                   strokeOpacity="0.3"
                   strokeWidth="2.5"
                 />
@@ -179,13 +196,13 @@ export function AccessCoverageChartCard({
                 patternUnits="userSpaceOnUse"
                 patternTransform="rotate(45)"
               >
-                <rect width="8" height="8" fill={CHART_TOKENS.series.mint.hatchBase} />
+                <rect width="8" height="8" fill={chart.series.mint.hatchBase} />
                 <line
                   x1="0"
                   y1="0"
                   x2="0"
                   y2="8"
-                  stroke={CHART_TOKENS.series.mint.hatchLine}
+                  stroke={chart.series.mint.hatchLine}
                   strokeOpacity="0.3"
                   strokeWidth="2.5"
                 />
@@ -197,13 +214,13 @@ export function AccessCoverageChartCard({
                 patternUnits="userSpaceOnUse"
                 patternTransform="rotate(45)"
               >
-                <rect width="8" height="8" fill={CHART_TOKENS.series.violet.hatchBase} />
+                <rect width="8" height="8" fill={chart.series.violet.hatchBase} />
                 <line
                   x1="0"
                   y1="0"
                   x2="0"
                   y2="8"
-                  stroke={CHART_TOKENS.series.violet.hatchLine}
+                  stroke={chart.series.violet.hatchLine}
                   strokeOpacity="0.3"
                   strokeWidth="2.5"
                 />
@@ -214,16 +231,20 @@ export function AccessCoverageChartCard({
               dataKey="label"
               axisLine={false}
               tickLine={false}
-              tick={CHART_TOKENS.axisTick}
+              tick={chart.axisTick}
             />
             <YAxis hide domain={[0, 115]} />
-            <Tooltip cursor={{ fill: CHART_TOKENS.tooltipCursor, radius: 14 }} content={<CoverageTooltip />} />
-            <Bar dataKey="score" radius={[14, 14, 14, 14]}>
+            <Tooltip
+              wrapperStyle={{ zIndex: 40, pointerEvents: 'none' }}
+              cursor={{ fill: chart.tooltipCursor, radius: 14 }}
+              content={<CoverageTooltip />}
+            />
+            <Bar dataKey="score" radius={[14, 14, 14, 14]} minPointSize={8}>
               <LabelList
                 dataKey="score"
                 position="top"
                 formatter={(val: unknown) => `${String(val ?? 0)}%`}
-                style={{ fill: CHART_TOKENS.labelFill, fontSize: 11, fontWeight: 600 }}
+                style={{ fill: chart.labelFill, fontSize: 11, fontWeight: 600 }}
               />
               {data.map((entry) => (
                 <Cell
@@ -239,4 +260,4 @@ export function AccessCoverageChartCard({
       </div>
     </article>
   );
-}
+});

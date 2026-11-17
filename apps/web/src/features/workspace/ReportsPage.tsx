@@ -1,74 +1,34 @@
-import { useEffect, useState } from 'react';
-import { CheckCircle2, Download, FileJson, FileSpreadsheet } from 'lucide-react';
+import { Download, FileJson, FileSpreadsheet } from 'lucide-react';
+import { ErrorAlertBanner } from '../../components/ErrorAlertBanner';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
-import { getErrorMessage, isAbortError } from '../../lib/errors';
+import { MetricCardsSkeleton } from '../../components/WorkspaceSkeletons';
 import { BUTTON_TOKENS, SURFACE_TOKENS } from '../../theme/tokens';
-import type { DashboardOverviewData } from '../../types/auth';
-import { getDashboardOverview } from '../dashboard/dashboardApi';
-import { downloadCsvReport, downloadJsonReport } from './workspaceApi';
+import { useReportsWorkspace } from '../../hooks/useReportsWorkspace';
 
 export function ReportsPage() {
-  const [overview, setOverview] = useState<DashboardOverviewData | null>(null);
-  const [exporting, setExporting] = useState<'csv' | 'json' | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    getDashboardOverview(controller.signal)
-      .then((data) => {
-        setOverview(data);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (isAbortError(err)) return;
-        setError(getErrorMessage(err, 'Unable to load report metrics.'));
-      });
-
-    return () => controller.abort();
-  }, []);
-
-  async function handleExportCsv() {
-    setExporting('csv');
-    setNotice(null);
-    setError(null);
-    try {
-      await downloadCsvReport();
-      setNotice('Downloaded CSV report and recorded export in security audit log.');
-    } catch (err) {
-      setError(getErrorMessage(err, 'Unable to export CSV report.'));
-    } finally {
-      setExporting(null);
-    }
-  }
-
-  async function handleExportJson() {
-    setExporting('json');
-    setNotice(null);
-    setError(null);
-    try {
-      await downloadJsonReport();
-      setNotice('Downloaded JSON report and recorded export in security audit log.');
-    } catch (err) {
-      setError(getErrorMessage(err, 'Unable to export JSON report.'));
-    } finally {
-      setExporting(null);
-    }
-  }
+  const {
+    overview,
+    exporting,
+    retrying,
+    error,
+    handleExportCsv,
+    handleExportJson,
+    handleRetry,
+  } = useReportsWorkspace();
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-100">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/30">
               <FileSpreadsheet className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                 Compliance Reports
               </h1>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 Export live project progress and directory governance snapshots.
               </p>
             </div>
@@ -81,7 +41,7 @@ export function ReportsPage() {
               onClick={() => void handleExportJson()}
               className={BUTTON_TOKENS.secondaryPill}
             >
-              <FileJson className="h-4 w-4 text-sky-600" />
+              <FileJson className="h-4 w-4 text-sky-600 dark:text-sky-400" />
               {exporting === 'json' ? 'Exporting...' : 'Export JSON'}
             </button>
 
@@ -97,47 +57,53 @@ export function ReportsPage() {
           </div>
         </div>
 
-        {notice ? (
-          <div
-            className={`flex items-center gap-2 ${BUTTON_TOKENS.alertSuccess}`}
-            role="status"
-          >
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <span>{notice}</span>
-          </div>
-        ) : null}
-
         {error ? (
-          <div className={BUTTON_TOKENS.alertError} role="alert">
-            {error}
-          </div>
+          <ErrorAlertBanner
+            message={error}
+            onRetry={() => void handleRetry()}
+            retrying={retrying}
+          />
         ) : null}
 
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <article className={`${SURFACE_TOKENS.panel} p-5`}>
-            <p className="text-xs font-medium text-slate-400 uppercase">Total Projects</p>
-            <p className="tabular-nums mt-2 text-3xl font-bold text-slate-900">
-              {overview ? overview.stats.totalProjects : '...'}
-            </p>
-          </article>
-          <article className={`${SURFACE_TOKENS.panel} p-5`}>
-            <p className="text-xs font-medium text-slate-400 uppercase">Completed Projects</p>
-            <p className="tabular-nums mt-2 text-3xl font-bold text-emerald-700">
-              {overview ? overview.stats.completedProjects : '...'}
-            </p>
-          </article>
-          <article className={`${SURFACE_TOKENS.panel} p-5`}>
-            <p className="text-xs font-medium text-slate-400 uppercase">Directory Users</p>
-            <p className="tabular-nums mt-2 text-3xl font-bold text-slate-900">
-              {overview ? overview.stats.totalUsers : '...'}
-            </p>
-          </article>
-          <article className={`${SURFACE_TOKENS.panel} p-5`}>
-            <p className="text-xs font-medium text-slate-400 uppercase">Completion Average</p>
-            <p className="tabular-nums mt-2 text-3xl font-bold text-sky-700">
-              {overview ? `${overview.stats.averageProgress}%` : '...'}
-            </p>
-          </article>
+          {!overview && !error ? (
+            <MetricCardsSkeleton count={4} />
+          ) : (
+            <>
+              <article className={`${SURFACE_TOKENS.panel} p-5`}>
+                <p className="text-xs font-medium text-slate-500 uppercase dark:text-slate-400">
+                  Total Projects
+                </p>
+                <p className="tabular-nums mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">
+                  {overview ? overview.stats.totalProjects : '--'}
+                </p>
+              </article>
+              <article className={`${SURFACE_TOKENS.panel} p-5`}>
+                <p className="text-xs font-medium text-slate-500 uppercase dark:text-slate-400">
+                  Completed Projects
+                </p>
+                <p className="tabular-nums mt-2 text-3xl font-bold text-emerald-700 dark:text-emerald-300">
+                  {overview ? overview.stats.completedProjects : '--'}
+                </p>
+              </article>
+              <article className={`${SURFACE_TOKENS.panel} p-5`}>
+                <p className="text-xs font-medium text-slate-500 uppercase dark:text-slate-400">
+                  Directory Users
+                </p>
+                <p className="tabular-nums mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">
+                  {overview ? overview.stats.totalUsers : '--'}
+                </p>
+              </article>
+              <article className={`${SURFACE_TOKENS.panel} p-5`}>
+                <p className="text-xs font-medium text-slate-500 uppercase dark:text-slate-400">
+                  Completion Average
+                </p>
+                <p className="tabular-nums mt-2 text-3xl font-bold text-sky-700 dark:text-sky-300">
+                  {overview ? `${overview.stats.averageProgress}%` : '--'}
+                </p>
+              </article>
+            </>
+          )}
         </section>
       </div>
     </DashboardLayout>

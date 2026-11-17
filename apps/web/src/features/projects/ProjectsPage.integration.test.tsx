@@ -1,0 +1,290 @@
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { Route, Routes } from 'react-router-dom';
+import { describe, expect, it } from 'vitest';
+import {
+  TEST_ADMIN_USER,
+  TEST_PROJECTS,
+  TEST_PROJECT_STATS,
+  TEST_VIEWER_USER,
+  createSessionFixture,
+} from '../../test/fixtures';
+import { server } from '../../test/mswServer';
+import { renderWithProviders } from '../../test/renderWithProviders';
+import { ProtectedRoute } from '../auth/ProtectedRoute';
+import { ProjectsPage } from './ProjectsPage';
+
+function renderProjectsRoute(initialEntry = '/projects') {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/login" element={<div>Login View</div>} />
+      <Route path="/unauthorized" element={<div>Unauthorized View</div>} />
+      <Route
+        path="/projects"
+        element={
+          <ProtectedRoute permission="projects:read">
+            <ProjectsPage />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>,
+    { initialEntries: [initialEntry] },
+  );
+}
+
+describe('ProjectsPage integration', () => {
+  it('loads projects, filters by status and track, and paginates via API query params', async () => {
+    const user = userEvent.setup();
+    document.cookie = 'csrf_token=admin-csrf.sig; path=/';
+
+    const recordedQueries: Array<{ status: string | null; category: string | null; page: string | null }> = [];
+
+    server.use(
+      http.post('*/api/auth/refresh', () =>
+        HttpResponse.json({
+          ok: true,
+          data: createSessionFixture(TEST_ADMIN_USER),
+        }),
+      ),
+      http.get('*/api/projects', ({ request }) => {
+        const url = new URL(request.url);
+        const status = url.searchParams.get('status');
+        const category = url.searchParams.get('category');
+        const page = url.searchParams.get('page') ?? '1';
+        recordedQueries.push({ status, category, page });
+
+        const filtered = TEST_PROJECTS.filter((project) => {
+          if (status && project.status !== status) return false;
+          if (category && project.category !== category) return false;
+          return true;
+        });
+
+        const listForPage =
+          page === '2'
+            ? [
+                {
+                  ...TEST_PROJECTS[1],
+                  id: 'prj_page_2',
+                  name: 'Page Two Initiative',
+                },
+              ]
+            : filtered;
+
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            projects: listForPage,
+            stats: TEST_PROJECT_STATS,
+            pagination: {
+              page: Number(page),
+              limit: 6,
+              total: 8,
+              totalPages: 2,
+            },
+          },
+        });
+      }),
+    );
+
+    renderProjectsRoute();
+
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Query Cache Observability')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /new project/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(await screen.findByText('Page Two Initiative')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /in progress \(1\)/i }));
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Query Cache Observability')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /filter by track/i }));
+    await user.click(screen.getByRole('option', { name: 'Security' }));
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(recordedQueries).toContainEqual({ status: null, category: null, page: '2' });
+      expect(recordedQueries).toContainEqual({ status: 'in_progress', category: null, page: '1' });
+      expect(recordedQueries).toContainEqual({
+        status: 'in_progress',
+        category: 'security',
+        page: '1',
+      });
+    });
+  });
+
+  it('creates a new project through ProjectFormModal and refreshes workspace list', async () => {
+    const user = userEvent.setup();
+    document.cookie = 'csrf_token=admin-csrf.sig; path=/';
+
+    const store = [...TEST_PROJECTS];
+
+    server.use(
+      http.post('*/api/auth/refresh', () =>
+        HttpResponse.json({
+          ok: true,
+          data: createSessionFixture(TEST_ADMIN_USER),
+        }),
+      ),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          ok: true,
+          data: {
+            projects: store,
+            stats: { ...TEST_PROJECT_STATS, total: store.length },
+            pagination: { page: 1, limit: 6, total: store.length, totalPages: 1 },
+          },
+        }),
+      ),
+      http.post('*/api/projects', async ({ request }) => {
+        const body = (await request.json()) as {
+          name: string;
+          description: string;
+          category: 'security';
+          status: 'in_progress';
+          priority: 'high';
+          tasksTotal: number;
+          tasksCompleted: number;
+        };
+
+        const created = {
+          ...TEST_PROJECTS[0],
+          id: 'prj_new_1',
+          name: body.name,
+          description: body.description,
+          category: body.category,
+          status: body.status,
+          priority: body.priority,
+          tasksTotal: body.tasksTotal,
+          tasksCompleted: body.tasksCompleted,
+          progress: Math.round((body.tasksCompleted / body.tasksTotal) * 100),
+        };
+        store.unshift(created);
+
+        return HttpResponse.json({ ok: true, data: { project: created } }, { status: 201 });
+      }),
+    );
+
+    renderProjectsRoute();
+
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /new project/i }));
+
+    await user.type(screen.getByLabelText('Project Name'), 'Audit Pipeline Hardening');
+    await user.type(screen.getByLabelText('Description'), 'Automate signed export checks.');
+    await user.click(screen.getByRole('button', { name: 'Create Project' }));
+
+    expect(await screen.findByText('Audit Pipeline Hardening')).toBeInTheDocument();
+    expect(screen.getByText('Created project "Audit Pipeline Hardening".')).toBeInTheDocument();
+  });
+
+  it('shows ErrorAlertBanner on API failure and recovers when user clicks Retry', async () => {
+    const user = userEvent.setup();
+    document.cookie = 'csrf_token=admin-csrf.sig; path=/';
+
+    let shouldFail = true;
+
+    server.use(
+      http.post('*/api/auth/refresh', () =>
+        HttpResponse.json({
+          ok: true,
+          data: createSessionFixture(TEST_ADMIN_USER),
+        }),
+      ),
+      http.get('*/api/projects', () => {
+        if (shouldFail) {
+          return HttpResponse.json(
+            { ok: false, error: { code: 'QUERY_REJECTED', message: 'Projects feed temporarily rejected' } },
+            { status: 400 },
+          );
+        }
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            projects: TEST_PROJECTS,
+            stats: TEST_PROJECT_STATS,
+            pagination: { page: 1, limit: 6, total: 2, totalPages: 1 },
+          },
+        });
+      }),
+    );
+
+    renderProjectsRoute();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Projects feed temporarily rejected');
+    shouldFail = false;
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+  });
+
+  it('hides project write buttons for read-only viewer accounts', async () => {
+    document.cookie = 'csrf_token=viewer-csrf.sig; path=/';
+
+    server.use(
+      http.post('*/api/auth/refresh', () =>
+        HttpResponse.json({
+          ok: true,
+          data: createSessionFixture(TEST_VIEWER_USER),
+        }),
+      ),
+    );
+
+    renderProjectsRoute();
+
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /new project/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /import/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit identity gateway migration/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /delete identity gateway migration/i })).not.toBeInTheDocument();
+  });
+
+  it('hydrates filters from URL search params and renders loading skeleton before data resolves', async () => {
+    document.cookie = 'csrf_token=admin-csrf.sig; path=/';
+    let receivedParams = '';
+
+    server.use(
+      http.post('*/api/auth/refresh', () =>
+        HttpResponse.json({
+          ok: true,
+          data: createSessionFixture(TEST_ADMIN_USER),
+        }),
+      ),
+      http.get('*/api/projects', async ({ request }) => {
+        receivedParams = new URL(request.url).searchParams.toString();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            projects: [TEST_PROJECTS[0]],
+            stats: TEST_PROJECT_STATS,
+            pagination: { page: 1, limit: 6, total: 1, totalPages: 1 },
+          },
+        });
+      }),
+    );
+
+    renderProjectsRoute('/projects?status=in_progress&category=security');
+
+    expect(await screen.findByLabelText('Loading projects')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(receivedParams).toContain('status=in_progress');
+    expect(receivedParams).toContain('category=security');
+  });
+});
