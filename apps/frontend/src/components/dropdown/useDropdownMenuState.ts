@@ -22,14 +22,14 @@ export function getDropdownTriggerClass(
   compact: boolean,
 ): string {
   if (variant === 'icon') {
-    return 'inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 transition hover:bg-slate-50 focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-800';
+    return 'inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 transition hover:bg-slate-50 focus:border-primary focus:bg-slate-50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus:bg-slate-800';
   }
   if (variant === 'field') {
     return 'flex w-full cursor-pointer items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2 text-left text-sm text-slate-900 transition focus:border-primary focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:focus:bg-slate-800';
   }
   return `inline-flex cursor-pointer items-center justify-between gap-2 rounded-full border border-slate-200 bg-slate-50 ${
     compact ? 'h-8 px-3 text-xs' : 'h-9 px-3.5 text-xs'
-  } font-semibold text-slate-700 transition hover:bg-white focus:border-primary focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-800/90`;
+  } font-semibold text-slate-700 transition hover:bg-white focus:border-primary focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-800/90 dark:focus:bg-slate-800 dark:focus:text-slate-100`;
 }
 
 export function useDropdownMenuState<T extends string>({
@@ -79,8 +79,9 @@ export function useDropdownMenuState<T extends string>({
 
     const rect = triggerEl.getBoundingClientRect();
     const viewportMargin = 10;
-    const minWidth = variant === 'field' ? rect.width : compact ? 92 : 148;
-    const maxWidth = variant === 'field' ? Math.max(rect.width, 260) : compact ? 132 : 220;
+    const minWidth = variant === 'field' ? rect.width : compact ? 92 : searchable ? 196 : 148;
+    const maxWidth =
+      variant === 'field' ? Math.max(rect.width, 260) : compact ? 132 : searchable ? 256 : 220;
     const menuWidth = Math.min(maxWidth, window.innerWidth - viewportMargin * 2);
     const actualWidth = Math.max(minWidth, menuWidth);
     const baseMaxHeight = searchable ? 268 : 196;

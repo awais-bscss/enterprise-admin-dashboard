@@ -126,7 +126,7 @@ export function DropdownPortal<T extends string>({
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
               aria-label={searchPlaceholder}
-              className="h-8 w-full rounded-xl border border-slate-200/80 bg-slate-50 pr-2.5 pl-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+              className="h-8 w-full rounded-xl border border-slate-200/80 bg-slate-50 pr-2.5 pl-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-500 dark:focus:bg-slate-900"
             />
           </div>
         </div>
@@ -137,7 +137,7 @@ export function DropdownPortal<T extends string>({
         role="listbox"
         aria-label={ariaLabel}
         aria-multiselectable={multiSelect || undefined}
-        className="flex-1 overflow-y-auto p-1"
+        className="flex-1 overflow-y-auto p-1 [scrollbar-width:thin] dark:[scrollbar-color:rgba(148,163,184,0.35)_transparent]"
       >
         {visibleOptions.length === 0 ? (
           <li className="px-3 py-2.5 text-center text-xs text-slate-400">{emptyMessage}</li>

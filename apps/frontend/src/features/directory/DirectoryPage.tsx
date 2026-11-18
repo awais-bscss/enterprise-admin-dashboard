@@ -169,6 +169,8 @@ export function DirectoryPage() {
 
             <AppDropdown
               value={departmentFilter}
+              searchable
+              searchPlaceholder="Search departments..."
               options={[
                 { value: '', label: 'All Departments' },
                 ...departments.map((dept) => ({

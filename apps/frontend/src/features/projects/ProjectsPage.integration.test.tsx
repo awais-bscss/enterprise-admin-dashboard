@@ -7,6 +7,7 @@ import {
   TEST_ADMIN_USER,
   TEST_PROJECTS,
   TEST_PROJECT_STATS,
+  TEST_TEAM_MEMBERS,
   TEST_VIEWER_USER,
   createSessionFixture,
 } from '../../test/fixtures';
@@ -331,6 +332,71 @@ describe('ProjectsPage integration', () => {
 
     await waitFor(() => {
       expect(recordedParams).toContainEqual({ clientId: 'cli_1', sort: 'deadline' });
+    });
+  });
+
+  it('loads multi-page dropdown options, searches employee filter options, and keeps dark focus contrast', async () => {
+    const user = userEvent.setup();
+    document.cookie = 'csrf_token=admin-csrf.sig; path=/';
+    const recordedOwnerQueries: Array<string | null> = [];
+
+    server.use(
+      http.get('*/api/users', ({ request }) => {
+        const url = new URL(request.url);
+        const page = Number(url.searchParams.get('page') ?? '1');
+        const users =
+          page === 2
+            ? [
+                {
+                  id: 'usr_page_2',
+                  name: 'Zainab Scale Member',
+                  email: 'zainab.scale@example.test',
+                  role: 'viewer',
+                  status: 'active',
+                  department: { id: 'dept_sec', name: 'Security', code: 'SEC' },
+                },
+              ]
+            : TEST_TEAM_MEMBERS;
+
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            users,
+            stats: { total: 3, active: 3, suspended: 0, admins: 1, managers: 1, viewers: 1 },
+            pagination: { page, limit: 100, total: 3, totalPages: 2 },
+          },
+        });
+      }),
+      http.get('*/api/projects', ({ request }) => {
+        const url = new URL(request.url);
+        recordedOwnerQueries.push(url.searchParams.get('ownerId'));
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            projects: TEST_PROJECTS,
+            stats: TEST_PROJECT_STATS,
+            pagination: { page: 1, limit: 8, total: TEST_PROJECTS.length, totalPages: 1 },
+          },
+        });
+      }),
+    );
+
+    renderProjectsRoute();
+
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+
+    const employeeTrigger = screen.getByRole('button', { name: /filter by employee/i });
+    expect(employeeTrigger.className).toContain('dark:focus:bg-slate-800');
+
+    await user.click(employeeTrigger);
+    const searchBox = screen.getByRole('searchbox', { name: 'Search employees...' });
+    await user.type(searchBox, 'Zainab Scale');
+    await user.click(await screen.findByRole('option', { name: 'Zainab Scale Member' }));
+
+    await waitFor(() => {
+      expect(recordedOwnerQueries).toContain('usr_page_2');
     });
   });
 });

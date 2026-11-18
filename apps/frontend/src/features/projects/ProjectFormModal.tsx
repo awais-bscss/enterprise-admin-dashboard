@@ -182,6 +182,8 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
               <AppDropdown
                 id="proj-dept"
                 variant="field"
+                searchable
+                searchPlaceholder="Search departments..."
                 value={departmentId}
                 options={[
                   { value: '', label: 'Unassigned' },
@@ -205,6 +207,8 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
               <AppDropdown
                 id="proj-client"
                 variant="field"
+                searchable
+                searchPlaceholder="Search clients..."
                 value={clientId}
                 options={[
                   { value: '', label: 'Internal / None' },

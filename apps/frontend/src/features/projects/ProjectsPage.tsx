@@ -125,6 +125,8 @@ export function ProjectsPage() {
 
             <AppDropdown
               value={departmentFilter}
+              searchable
+              searchPlaceholder="Search departments..."
               options={[
                 { value: '', label: 'All Departments' },
                 ...departments.map((dept) => ({
@@ -138,6 +140,8 @@ export function ProjectsPage() {
 
             <AppDropdown
               value={clientFilter}
+              searchable
+              searchPlaceholder="Search clients..."
               options={[
                 { value: '', label: 'All Clients' },
                 ...clients.map((client) => ({
@@ -151,6 +155,8 @@ export function ProjectsPage() {
 
             <AppDropdown
               value={ownerFilter}
+              searchable
+              searchPlaceholder="Search employees..."
               options={[
                 { value: '', label: 'All Employees' },
                 ...employees.map((emp) => ({

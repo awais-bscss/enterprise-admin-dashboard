@@ -184,6 +184,8 @@ export function UserFormModal({
             <AppDropdown
               id="user-modal-dept"
               variant="field"
+              searchable
+              searchPlaceholder="Search departments..."
               value={departmentId}
               options={[
                 { value: '', label: 'Unassigned' },
