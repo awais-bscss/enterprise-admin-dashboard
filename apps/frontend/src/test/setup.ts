@@ -8,6 +8,7 @@ import { server } from './mswServer';
 // Prevent background chunk preloading from importing unrelated heavy routes during test teardown.
 vi.mock('../app/routePreload', () => ({
   loadDashboardPage: vi.fn(),
+  loadDashboardChartsGrid: vi.fn(),
   loadProjectsPage: vi.fn(),
   loadDepartmentsPage: vi.fn(),
   loadClientsPage: vi.fn(),
@@ -16,6 +17,11 @@ vi.mock('../app/routePreload', () => ({
   loadReportsPage: vi.fn(),
   preloadRoute: vi.fn(),
 }));
+
+Object.defineProperty(window, 'scrollTo', {
+  writable: true,
+  value: vi.fn(),
+});
 
 if (!window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {

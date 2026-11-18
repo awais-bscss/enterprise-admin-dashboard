@@ -8,7 +8,7 @@ function startService(scriptName) {
     : spawn("npm", ["run", scriptName], { stdio: "inherit" });
 }
 
-const children = [startService("dev:api"), startService("dev:web")];
+const children = [startService("dev:backend"), startService("dev:frontend")];
 
 function shutdown() {
   for (const child of children) {

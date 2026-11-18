@@ -284,4 +284,53 @@ describe('ProjectsPage integration', () => {
     expect(receivedParams).toContain('status=in_progress');
     expect(receivedParams).toContain('departmentId=dept_sec');
   });
+
+  it('filters by clientId, sorts by deadline, and renders team lead plus working team counts', async () => {
+    const user = userEvent.setup();
+    document.cookie = 'csrf_token=admin-csrf.sig; path=/';
+
+    const recordedParams: Array<{ clientId: string | null; sort: string | null }> = [];
+
+    server.use(
+      http.get('*/api/projects', ({ request }) => {
+        const url = new URL(request.url);
+        const clientId = url.searchParams.get('clientId');
+        const sort = url.searchParams.get('sort');
+        recordedParams.push({ clientId, sort });
+
+        const projects = TEST_PROJECTS.filter((project) =>
+          clientId ? project.client?.id === clientId : true,
+        );
+
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            projects,
+            stats: TEST_PROJECT_STATS,
+            pagination: { page: 1, limit: 8, total: projects.length, totalPages: 1 },
+          },
+        });
+      }),
+    );
+
+    renderProjectsRoute();
+
+    expect(
+      await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('2 employees')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /filter by client/i }));
+    await user.click(screen.getByRole('option', { name: 'Northstar Logistics' }));
+
+    expect(screen.getByText('Identity Gateway Migration')).toBeInTheDocument();
+    expect(screen.queryByText('Query Cache Observability')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /sort projects/i }));
+    await user.click(screen.getByRole('option', { name: 'Nearest Deadline' }));
+
+    await waitFor(() => {
+      expect(recordedParams).toContainEqual({ clientId: 'cli_1', sort: 'deadline' });
+    });
+  });
 });

@@ -6,7 +6,7 @@ import { z } from "zod";
 
 dotenv.config();
 
-// Load apps/api/.env when started from the repo root in local dev.
+// Load apps/backend/.env when started from the repo root in local dev.
 if (process.env.NODE_ENV !== "production" && !process.env.MONGODB_URI) {
   const dir = path.dirname(fileURLToPath(import.meta.url));
   const paths = [path.resolve(dir, "../../.env"), path.resolve(dir, "../../../.env")];

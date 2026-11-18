@@ -7,7 +7,7 @@ test.describe('Authentication, Projects Workspace, and RBAC E2E journey', () => 
   }) => {
     await installMockBackend(page);
 
-    await page.goto('/settings');
+    await page.goto('/audit');
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole('button', { name: /^login$/i })).toBeVisible();
 
@@ -20,8 +20,8 @@ test.describe('Authentication, Projects Workspace, and RBAC E2E journey', () => 
 
     await page.getByLabel('Password', { exact: true }).fill('ValidAdmin99!');
     await page.getByRole('button', { name: /^login$/i }).click();
-    await expect(page).toHaveURL(/\/settings$/);
-    await expect(page.getByRole('heading', { name: 'System Security Settings' })).toBeVisible();
+    await expect(page).toHaveURL(/\/audit$/);
+    await expect(page.getByRole('heading', { name: 'Security Audit Logs' })).toBeVisible();
 
     await page.getByRole('link', { name: 'Overview', exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
@@ -37,22 +37,22 @@ test.describe('Authentication, Projects Workspace, and RBAC E2E journey', () => 
     await page.getByLabel('Project Name').fill('Zero Trust Policy Rollout');
     await page.getByLabel('Description').fill('Enforce session rotation across portal edges.');
     await page.getByRole('button', { name: 'Create Project' }).click();
-    await expect(page.getByRole('heading', { name: 'Zero Trust Policy Rollout' })).toBeVisible();
+    await expect(page.getByText('Zero Trust Policy Rollout').first()).toBeVisible();
     await expect(page.getByText('Created project "Zero Trust Policy Rollout".')).toBeVisible();
 
     await page.getByRole('button', { name: 'Logout' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
-    await page.goto('/settings');
+    await page.goto('/audit');
     await expect(page).toHaveURL(/\/login$/);
     await page.getByLabel('Work email', { exact: true }).fill(E2E_USERS.viewer.email);
     await page.getByLabel('Password', { exact: true }).fill('ValidViewer99!');
     await page.getByRole('button', { name: /^login$/i }).click();
 
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByLabel('Restricted for current role')).toHaveCount(3);
+    await expect(page.getByLabel('Restricted for current role')).toHaveCount(2);
 
-    await page.goto('/settings');
+    await page.goto('/audit');
     await expect(page).toHaveURL(/\/unauthorized$/);
     await expect(page.getByRole('heading', { name: 'Access Restricted' })).toBeVisible();
 
@@ -61,7 +61,7 @@ test.describe('Authentication, Projects Workspace, and RBAC E2E journey', () => 
 
     await page.getByRole('link', { name: 'Projects', exact: true }).click();
     await expect(page).toHaveURL(/\/projects$/);
-    await expect(page.getByRole('heading', { name: 'Zero Trust Policy Rollout' })).toBeVisible();
+    await expect(page.getByText('Zero Trust Policy Rollout').first()).toBeVisible();
     await expect(page.getByRole('button', { name: /new project/i })).toHaveCount(0);
   });
 });

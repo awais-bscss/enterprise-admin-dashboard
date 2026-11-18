@@ -1,6 +1,6 @@
 # Structured Output Runtime Validation & Adapter
 
-Standalone exercise isolated from the main application runtime (`apps/web`, `apps/api`).
+Standalone exercise isolated from the main application runtime (`apps/frontend`, `apps/backend`).
 
 ## What It Demonstrates
 

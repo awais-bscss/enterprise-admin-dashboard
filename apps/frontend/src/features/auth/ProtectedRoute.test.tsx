@@ -88,8 +88,8 @@ describe('ProtectedRoute and PermissionGate', () => {
       ),
     );
 
-    renderWithProviders(<TestRoutes />, { initialEntries: ['/settings'] });
-    expect(await screen.findByText('System Settings Console')).toBeInTheDocument();
+    renderWithProviders(<TestRoutes />, { initialEntries: ['/reports'] });
+    expect(await screen.findByText('Reports Export Console')).toBeInTheDocument();
   });
 
   it('renders write controls via PermissionGate when permission is granted', async () => {

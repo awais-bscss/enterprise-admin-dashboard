@@ -17,7 +17,7 @@ function renderLoginHarness(requestedFrom?: string) {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/dashboard" element={<div>Overview Workspace</div>} />
-      <Route path="/settings" element={<div>Settings Workspace</div>} />
+      <Route path="/reports" element={<div>Reports Workspace</div>} />
     </Routes>,
     { initialEntries: [initialEntry] },
   );
@@ -84,12 +84,12 @@ describe('LoginPage integration', () => {
       ),
     );
 
-    renderLoginHarness('/settings');
+    renderLoginHarness('/reports');
     await user.type(screen.getByLabelText('Work email'), TEST_ADMIN_USER.email);
     await user.type(screen.getByLabelText('Password'), 'ValidPass99!');
     await user.click(screen.getByRole('button', { name: /^login$/i }));
 
-    expect(await screen.findByText('Settings Workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Reports Workspace')).toBeInTheDocument();
   });
 
   it('falls back to /dashboard instead of restricted route when viewer logs in', async () => {
@@ -104,7 +104,7 @@ describe('LoginPage integration', () => {
       ),
     );
 
-    renderLoginHarness('/settings');
+    renderLoginHarness('/reports');
     await user.type(screen.getByLabelText('Work email'), TEST_VIEWER_USER.email);
     await user.type(screen.getByLabelText('Password'), 'ValidPass99!');
     await user.click(screen.getByRole('button', { name: /^login$/i }));

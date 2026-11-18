@@ -14,8 +14,10 @@ export const ROUTE_PERMISSIONS: Record<string, Permission | undefined> = {
 
 export function canUserAccessPath(user: AuthUser | null, pathname: string): boolean {
   if (!user) return false;
-  if (pathname === '/login' || pathname === '/unauthorized') return false;
-  const required = ROUTE_PERMISSIONS[pathname];
+  const cleanPath = pathname.split('?')[0] ?? pathname;
+  if (cleanPath === '/login' || cleanPath === '/unauthorized') return false;
+  if (!(cleanPath in ROUTE_PERMISSIONS)) return false;
+  const required = ROUTE_PERMISSIONS[cleanPath];
   return !required || user.permissions.includes(required);
 }
 

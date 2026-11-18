@@ -84,7 +84,7 @@ function resolveSeedAccounts(): SeedAccount[] {
   if (!parsed.success) {
     const details = parsed.error.issues.map((issue) => issue.message).join("; ");
     throw new Error(
-      `Missing or invalid seed environment variables (${details}). Configure them in apps/api/.env before running seed.`,
+      `Missing or invalid seed environment variables (${details}). Configure them in apps/backend/.env before running seed.`,
     );
   }
 

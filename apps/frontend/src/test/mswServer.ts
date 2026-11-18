@@ -3,7 +3,9 @@ import { setupServer } from 'msw/node';
 import {
   TEST_ACTIVITY_TREND,
   TEST_ADMIN_USER,
+  TEST_CLIENTS,
   TEST_DASHBOARD_SUMMARY,
+  TEST_DEPARTMENTS,
   TEST_EMPLOYEE_STATUS,
   TEST_PAGINATION,
   TEST_PROJECT_STATS,
@@ -72,6 +74,26 @@ export const defaultHandlers = [
       data: {
         users: TEST_TEAM_MEMBERS,
         stats: { total: 2, active: 2, suspended: 0, admins: 1, managers: 1, viewers: 0 },
+        pagination: TEST_PAGINATION,
+      },
+    }),
+  ),
+  http.get('*/api/departments', () =>
+    HttpResponse.json({
+      ok: true,
+      data: {
+        departments: TEST_DEPARTMENTS,
+        stats: { total: 2, active: 2, inactive: 0 },
+        pagination: TEST_PAGINATION,
+      },
+    }),
+  ),
+  http.get('*/api/clients', () =>
+    HttpResponse.json({
+      ok: true,
+      data: {
+        clients: TEST_CLIENTS,
+        stats: { total: 2, active: 2, inactive: 0 },
         pagination: TEST_PAGINATION,
       },
     }),

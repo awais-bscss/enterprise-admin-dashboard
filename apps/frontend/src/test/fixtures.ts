@@ -1,11 +1,13 @@
 import type {
   AuthSessionData,
   AuthUser,
+  ClientItem,
   DashboardActivityTrendData,
   DashboardEmployeeStatusData,
   DashboardStatusBreakdownData,
   DashboardSummaryData,
   DashboardTrackProgressData,
+  DepartmentItem,
   DirectoryPreviewUser,
   ProjectItem,
   ProjectsWorkspaceStats,
@@ -228,3 +230,55 @@ export const TEST_EMPLOYEE_STATUS: DashboardEmployeeStatusData = {
     { role: 'viewer', count: 1 },
   ],
 };
+
+export const TEST_DEPARTMENTS: DepartmentItem[] = [
+  {
+    id: 'dept_sec',
+    name: 'Security',
+    code: 'SEC',
+    headName: 'Omar Tariq',
+    description: 'Application security and RBAC governance.',
+    status: 'active',
+    employeeCount: 1,
+    projectCount: 1,
+    createdAt: '2026-11-01T10:00:00.000Z',
+    updatedAt: '2026-11-01T10:00:00.000Z',
+  },
+  {
+    id: 'dept_be',
+    name: 'Backend',
+    code: 'BE',
+    headName: 'Hamza Raza',
+    description: 'REST APIs and distributed services.',
+    status: 'active',
+    employeeCount: 1,
+    projectCount: 1,
+    createdAt: '2026-11-01T10:00:00.000Z',
+    updatedAt: '2026-11-01T10:00:00.000Z',
+  },
+];
+
+export const TEST_CLIENTS: ClientItem[] = [
+  {
+    id: 'cli_1',
+    name: 'Elena Rostova',
+    company: 'Northstar Logistics',
+    email: 'elena@northstar.example',
+    phone: '+1-555-0142',
+    status: 'active',
+    projectCount: 1,
+    createdAt: '2026-11-01T10:00:00.000Z',
+    updatedAt: '2026-11-01T10:00:00.000Z',
+  },
+  {
+    id: 'cli_2',
+    name: 'Marcus Vance',
+    company: 'Apex FinTech Group',
+    email: 'marcus@apexfintech.example',
+    phone: '+1-555-0188',
+    status: 'active',
+    projectCount: 0,
+    createdAt: '2026-11-01T10:00:00.000Z',
+    updatedAt: '2026-11-01T10:00:00.000Z',
+  },
+];

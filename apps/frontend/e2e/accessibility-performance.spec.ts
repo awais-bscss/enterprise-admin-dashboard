@@ -3,7 +3,15 @@ import { expect, test } from '@playwright/test';
 import { installMockBackend } from './mockBackend';
 
 const PUBLIC_ROUTES = ['/login'];
-const PROTECTED_ROUTES = ['/dashboard', '/projects', '/users', '/audit', '/reports', '/settings'];
+const PROTECTED_ROUTES = [
+  '/dashboard',
+  '/projects',
+  '/departments',
+  '/clients',
+  '/employees',
+  '/audit',
+  '/reports',
+];
 
 test.describe('WCAG 2.1 AA Accessibility & Core Web Vitals Audits', () => {
   test('passes Axe accessibility checks on login and across authenticated routes in dark mode', async ({
