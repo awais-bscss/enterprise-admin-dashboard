@@ -26,10 +26,8 @@ const optionalSeedString = z
 const seedEnvSchema = z
   .object({
     SEED_ADMIN_NAME: optionalSeedString,
-    SEED_ADMIN_EMAIL: z.string().trim().email("SEED_ADMIN_EMAIL must be a valid email"),
-    SEED_ADMIN_PASSWORD: z
-      .string()
-      .min(8, "SEED_ADMIN_PASSWORD must be at least 8 characters"),
+    SEED_ADMIN_EMAIL: optionalSeedString,
+    SEED_ADMIN_PASSWORD: z.string().optional(),
     SEED_MANAGER_NAME: optionalSeedString,
     SEED_MANAGER_EMAIL: optionalSeedString,
     SEED_MANAGER_PASSWORD: z.string().optional(),
@@ -38,11 +36,16 @@ const seedEnvSchema = z
     SEED_VIEWER_PASSWORD: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    const optionalRoles: Array<{
+    const roleEntries: Array<{
       prefix: string;
       email?: string;
       password?: string;
     }> = [
+      {
+        prefix: "SEED_ADMIN",
+        email: data.SEED_ADMIN_EMAIL,
+        password: data.SEED_ADMIN_PASSWORD,
+      },
       {
         prefix: "SEED_MANAGER",
         email: data.SEED_MANAGER_EMAIL,
@@ -55,7 +58,7 @@ const seedEnvSchema = z
       },
     ];
 
-    for (const entry of optionalRoles) {
+    for (const entry of roleEntries) {
       const hasEmail = Boolean(entry.email);
       const hasPassword = Boolean(entry.password && entry.password.length > 0);
       if (hasEmail !== hasPassword) {
@@ -84,20 +87,22 @@ function resolveSeedAccounts(): SeedAccount[] {
   if (!parsed.success) {
     const details = parsed.error.issues.map((issue) => issue.message).join("; ");
     throw new Error(
-      `Missing or invalid seed environment variables (${details}). Configure them in apps/backend/.env before running seed.`,
+      `Invalid seed environment variables (${details}). Configure them in apps/backend/.env before running seed.`,
     );
   }
 
   const data = parsed.data;
-  const accounts: SeedAccount[] = [
-    {
+  const accounts: SeedAccount[] = [];
+
+  if (data.SEED_ADMIN_EMAIL && data.SEED_ADMIN_PASSWORD) {
+    accounts.push({
       name: data.SEED_ADMIN_NAME ?? "Workspace Admin",
       email: data.SEED_ADMIN_EMAIL.toLowerCase(),
       password: data.SEED_ADMIN_PASSWORD,
       role: "admin",
       departmentCode: "SEC",
-    },
-  ];
+    });
+  }
 
   if (data.SEED_MANAGER_EMAIL && data.SEED_MANAGER_PASSWORD) {
     accounts.push({
@@ -179,11 +184,62 @@ const DEFAULT_DEPARTMENTS = [
     description: "Talent acquisition, employee onboarding, and people operations.",
     status: "active",
   },
+  {
+    name: "SQA",
+    code: "SQA",
+    headName: "Awab Hamayun",
+    description: "Software quality assurance, regression testing, and release verification.",
+    status: "active",
+  },
 ] as const;
+
+interface SeedEmployee {
+  name: string;
+  email: string;
+  role: Role;
+  status: "active" | "suspended";
+  departmentCode: string;
+}
+
+const SEED_EMPLOYEES: readonly SeedEmployee[] = [
+  { name: "Muhammad Arhum", email: "arhum@test.com", role: "viewer", status: "active", departmentCode: "AI" },
+  { name: "Muhammad Mujtaba", email: "mujtaba@test.com", role: "viewer", status: "active", departmentCode: "AI" },
+  { name: "Maham Hafeez", email: "maham@test.com", role: "viewer", status: "active", departmentCode: "FE" },
+  { name: "Muhammad Umair", email: "umair@test.com", role: "manager", status: "active", departmentCode: "SEO" },
+  { name: "Muhammad Awais", email: "awais@test.com", role: "viewer", status: "active", departmentCode: "FE" },
+  { name: "Awab Hamayun", email: "awab@test.com", role: "viewer", status: "active", departmentCode: "SQA" },
+  { name: "Muhammad Fraz", email: "fraz@test.com", role: "viewer", status: "active", departmentCode: "BE" },
+  { name: "Awais Jameel", email: "awaisj@test.com", role: "viewer", status: "active", departmentCode: "DEVOPS" },
+  { name: "Tauqir Hayat", email: "tauqir@test.com", role: "viewer", status: "active", departmentCode: "BE" },
+  { name: "Umaid Khalid", email: "umaid@test.com", role: "manager", status: "active", departmentCode: "BE" },
+  { name: "Mujtaba Ali", email: "mujtabaa@test.com", role: "manager", status: "active", departmentCode: "UIUX" },
+  // CSV status "inactive" maps to existing schema enum value "suspended".
+  { name: "Muhammad Ahmad", email: "ahmad@test.com", role: "viewer", status: "suspended", departmentCode: "BE" },
+  { name: "Arbaz Ahmad", email: "arbaz@test.com", role: "viewer", status: "active", departmentCode: "FE" },
+  { name: "Ali Hamza", email: "ahamza@test.com", role: "viewer", status: "active", departmentCode: "SQA" },
+  { name: "Anoosha Waris", email: "anoosha@test.com", role: "manager", status: "active", departmentCode: "HR" },
+  { name: "Aqeel Abbas", email: "aqeel@test.com", role: "viewer", status: "active", departmentCode: "FE" },
+  { name: "Muhammad Muntaha", email: "muntaha@test.com", role: "viewer", status: "active", departmentCode: "BE" },
+  { name: "Sammar Ahmad", email: "sammar@test.com", role: "viewer", status: "active", departmentCode: "SEO" },
+  { name: "Muhammad Waqas", email: "waqas@test.com", role: "manager", status: "active", departmentCode: "HR" },
+  { name: "Rosheel Baig", email: "rosheel@test.com", role: "admin", status: "active", departmentCode: "HR" },
+  { name: "Maheen Nasir", email: "maheen@test.com", role: "manager", status: "active", departmentCode: "FE" },
+];
 
 async function seed(): Promise<void> {
   const accounts = resolveSeedAccounts();
   await mongoose.connect(env.MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
+
+  const hasEnvAdmin = accounts.some((account) => account.role === "admin");
+  const existingAdmin = hasEnvAdmin
+    ? null
+    : await User.findOne({ role: "admin" }).select("_id name email").lean();
+
+  if (!hasEnvAdmin && !existingAdmin) {
+    throw new Error(
+      "Missing SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in apps/backend/.env and no existing admin user found in database.",
+    );
+  }
 
   await Department.bulkWrite(
     DEFAULT_DEPARTMENTS.map((dept) => ({
@@ -246,8 +302,44 @@ async function seed(): Promise<void> {
     seededUsers.set(account.role, userDoc._id);
   }
 
-  const adminAccount = accounts[0]!;
-  const adminId = seededUsers.get("admin")!;
+  const explicitEmployeePassword = process.env.SEED_EMPLOYEE_PASSWORD?.trim();
+  const employeePasswordSuffix = process.env.SEED_EMPLOYEE_PASSWORD_SUFFIX?.trim() || "@12345";
+
+  const employeeBulkOps = await Promise.all(
+    SEED_EMPLOYEES.map(async (employee) => {
+      const email = employee.email.toLowerCase();
+      const emailPrefix = email.split("@")[0] ?? email;
+      const rawPassword = explicitEmployeePassword || `${emailPrefix}${employeePasswordSuffix}`;
+      const passwordHash = await bcrypt.hash(rawPassword, 10);
+
+      return {
+        updateOne: {
+          filter: { email },
+          update: {
+            $set: {
+              name: employee.name,
+              role: employee.role,
+              status: employee.status,
+              departmentId: deptByCode.get(employee.departmentCode) ?? null,
+              passwordHash,
+            },
+            $setOnInsert: {
+              email,
+            },
+          },
+          upsert: true,
+        },
+      };
+    }),
+  );
+
+  await User.bulkWrite(employeeBulkOps);
+
+  const envAdmin = accounts.find((account) => account.role === "admin");
+  const adminAccount = envAdmin
+    ? { name: envAdmin.name, email: envAdmin.email }
+    : { name: existingAdmin!.name, email: existingAdmin!.email };
+  const adminId = seededUsers.get("admin") ?? existingAdmin!._id;
   const managerId = seededUsers.get("manager") ?? adminId;
 
   const existingProjects = await Project.countDocuments();
@@ -352,7 +444,9 @@ async function seed(): Promise<void> {
     ]);
   }
 
-  console.log(`Seeded ${accounts.length} enterprise accounts, projects, departments, and clients.`);
+  console.log(
+    `Seeded ${accounts.length} login accounts, ${SEED_EMPLOYEES.length} directory employees, projects, departments, and clients.`,
+  );
   await mongoose.disconnect();
 }
 
