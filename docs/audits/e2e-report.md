@@ -1,36 +1,30 @@
-# End-to-End (E2E) Verification Report — Enterprise Admin Portal
+# End-to-End (E2E) Test Report
 
-**Runner:** Playwright Test (`1.65.1`) + Headless Chromium (`159.0.8154.6`)  
-**Target Under Test:** Compiled production bundle (`apps/web/dist`) served via `vite preview` at `http://127.0.0.1:4173`  
-**Shared Network Harness:** [`apps/web/e2e/mockBackend.ts`](../../apps/web/e2e/mockBackend.ts)
+Summary of Playwright browser tests verifying authentication, role permissions, workspace CRUD flows, accessibility, and basic page-load vitals.
 
----
+## How E2E Tests Run
 
-## 1. Executed Test Suites (`3 passed / 0 failed`)
+- **Config:** `apps/frontend/playwright.config.ts`
+- **Target Server:** `npm run preview -- --host 127.0.0.1 --port 4173 --strictPort` (tests the real production Vite build)
+- **API Stub:** `apps/frontend/e2e/mockBackend.ts` intercepts `/api/*` requests in the browser so tests run reliably offline
+- **Command:** `npm run test:e2e`
 
-| Spec File | Test Case | Runtime | Outcome |
-| --- | --- | --- | --- |
-| [`accessibility-performance.spec.ts`](../../apps/web/e2e/accessibility-performance.spec.ts) | `passes Axe accessibility checks on login and across authenticated routes in dark mode` | `15.9 s` | Pass (`0` WCAG 2.1 AA violations) |
-| [`accessibility-performance.spec.ts`](../../apps/web/e2e/accessibility-performance.spec.ts) | `records clean Core Web Vitals bounds and avoids eager dashboard chart chunk loading on /login` | `2.2 s` | Pass (`CLS <= 0.0025`, `LCP <= 732 ms`, deferred charts verified) |
-| [`auth-projects-rbac.spec.ts`](../../apps/web/e2e/auth-projects-rbac.spec.ts) | `enforces auth redirects, project creation for admin, logout, and cross-role RBAC guards for viewer` | `5.0 s` | Pass |
+## Latest Run Summary
 
----
+- **Browser:** Desktop Chrome (Playwright Chromium)
+- **Result:** **3 passed / 3 total** (`43.7s`)
 
-## 2. End-to-End Journey Assertions Covered
+### Test 1: Auth, Projects & RBAC Flow (`auth-projects-rbac.spec.ts`)
+1. Visiting `/audit` while signed out redirects to `/login`.
+2. Entering a wrong password shows the `Invalid email or password` alert.
+3. Signing in as `admin` returns to the requested `/audit` page (`Security Audit Logs`).
+4. Navigating to `/dashboard` and `/projects`, opening **New Project**, and creating `"Zero Trust Policy Rollout"` updates the list and shows a success toast.
+5. Clicking **Logout** returns to `/login`.
+6. Signing in as `viewer` lands on `/dashboard`, displays 2 restricted nav badges, blocks `/audit` by redirecting to `/unauthorized` (`Access Restricted`), and hides the `New Project` button on `/projects`.
 
-1. **Unauthenticated route protection:** Visiting `/settings` logged out redirects cleanly to `/login`.
-2. **Error handling:** Invalid credentials remain on `/login` and render accessible `role="alert"` error feedback.
-3. **Authenticated Admin flow:** Admin sign-in restores permitted return URL (`/settings`), navigates across `Overview` (`/dashboard`) and `Projects` (`/projects`), opens `ProjectFormModal`, submits `Zero Trust Policy Rollout`, and verifies card + toast persistence.
-4. **Session cleanup & cross-role RBAC:** Logging out clears `csrf_token` cookie and routes to `/login`; signing back in as `viewer` safely resolves `/dashboard` instead of the stale `/settings` redirect, displays sidebar role lock indicators (`3` restricted sections), redirects direct `/settings` visits to `/unauthorized` (`Access Restricted`), and hides `New Project` controls on `/projects`.
+### Test 2: Accessibility Audit (`accessibility-performance.spec.ts`)
+- Runs Axe (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`) on `/login` and across `/dashboard`, `/projects`, `/departments`, `/clients`, `/employees`, `/audit`, `/reports` in dark mode with zero violations.
 
----
-
-## 3. Standalone Isolated Exercise Verification
-
-The standalone untrusted structured output adapter in [`exercises/structured-output-adapter/README.md`](../../exercises/structured-output-adapter/README.md) was also verified independently via Node.js built-in test runner (`node --test`):
-
-```bash
-npm run test:exercise
-```
-
-- `4 / 4` test cases passed (`v1` full adaptation, `v2` schema drift + fenced JSON + XSS/URI blocking, malformed fallback mode, and reference-stable derived selector memoization).
+### Test 3: Core Web Vitals & Lazy Chunks (`accessibility-performance.spec.ts`)
+- Verifies `/login` keeps CLS under `0.1`, LCP under `2500ms`, and does **not** download `DashboardPage` before login.
+- Verifies `/dashboard` loads `DashboardPage` lazily and keeps DOM nodes under `1500` (`484` measured) and CLS under `0.1` (`0.004` measured).

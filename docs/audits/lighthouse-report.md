@@ -1,43 +1,39 @@
-# Lighthouse Audit Report — Enterprise Admin Portal
+# Lighthouse Report (Local Dev vs Live Vercel)
 
-**Audited Target:** `http://127.0.0.1:4174/login` (`apps/web` production build served via `vite preview`)  
-**Browser:** Headless Chromium (`159.0.8154.6`) via Lighthouse CLI
+A straightforward summary of Chrome DevTools Lighthouse results on both `localhost` (Vite dev server) and the live Vercel deployment.
 
----
+## 1. Live Production Scores (`https://enterprise-admin-dashboard-ebon.vercel.app/dashboard`)
 
-## 1. Category Scores
+Captured from Chrome DevTools Lighthouse on the deployed Vercel build:
 
-| Category | Measured Score | Status |
+| Category | Score | Notes |
 | --- | --- | --- |
-| **Performance** | `97 / 100` | Pass |
-| **Accessibility** | `100 / 100` | Pass |
-| **Best Practices** | `100 / 100` | Pass |
-| **SEO** | `100 / 100` | Pass |
+| **Performance** | **88** | Fast initial render (`FCP 0.6 s`, `LCP 1.4 s`, `TBT 80 ms`, `CLS 0.005`) |
+| **Accessibility** | **100** | Zero accessibility issues flagged |
+| **Best Practices** | **81** | Room to tighten browser/script diagnostics |
+| **SEO** | **100** | Meta tags, document title, and crawl rules in place (`apps/frontend/public/robots.txt`) |
 
----
+### Core Web Vitals Measured on Vercel `/dashboard`
 
-## 2. Core Web Vitals & Timing Metrics
+- **First Contentful Paint (FCP):** `0.6 s`
+- **Largest Contentful Paint (LCP):** `1.4 s`
+- **Total Blocking Time (TBT):** `80 ms`
+- **Cumulative Layout Shift (CLS):** `0.005`
+- **Speed Index:** `3.1 s`
 
-| Audit Metric | Display Value | Raw Value | Lighthouse Score |
-| --- | --- | --- | --- |
-| First Contentful Paint (`FCP`) | `0.8 s` | `752.854 ms` | `1.00` |
-| Largest Contentful Paint (`LCP`) | `0.8 s` | `752.854 ms` | `1.00` |
-| Total Blocking Time (`TBT`) | `210 ms` | `208.573 ms` | `0.89` |
-| Cumulative Layout Shift (`CLS`) | `0` | `0` | `1.00` |
-| Speed Index | `0.8 s` | `752.854 ms` | `1.00` |
-| Time to Interactive (`TTI`) | `2.1 s` | `2148.854 ms` | `0.99` |
+## 2. Why `localhost:5173` Scored Much Lower (`25–26` Performance)
 
----
+Early local Lighthouse runs on `http://localhost:5173/dashboard` showed `Performance 25–26`, `Accessibility 96`, `Best Practices 81`, and `SEO 100`. That drop happened for two clear reasons:
 
-## 3. Optimizations Reflected in Final Run
+1. **Dev server vs production build:** `npm run dev` serves unminified, unbundled modules with Vite HMR, so Lighthouse sees many extra module requests and slower JS evaluation (`FCP 6.2 s`, `LCP 11.8 s`, `TBT 2,050 ms`).
+2. **Chrome extensions active:** Chrome DevTools showed the warning *"Chrome extensions negatively affected this page's load performance. Try auditing the page in incognito mode or from a Chrome profile without extensions."* Extensions inject extra scripts on every page load.
 
-1. **Vendor & Route Splitting (`apps/web/vite.config.ts`):** Isolated `vendor-react`, `vendor-data`, and `vendor-icons` from the application entry (`42.60 kB` / `12.63 kB` gzip) and deferred `DashboardPage` (`Recharts`) loading until sign-in.
-2. **HTML Document Hygiene (`apps/web/index.html` & `apps/web/public/robots.txt`):** Added descriptive `<meta name="description">`, `<meta name="theme-color">`, and valid `robots.txt` (`Disallow: /api/`), resolving SPA fallback SEO errors cleanly (`SEO` improved from `91` to `100`).
-3. **Accessibility Remediation:** Fixed dark-mode contrast and WCAG 2.5.3 Label-in-Name mismatches in layout and pagination controls.
+**Rule of thumb for accurate audits:** Always test `npm run build:frontend` + `npm run preview` (or the live Vercel URL) in an **Incognito** window with extensions disabled.
 
----
+## 3. Remaining Optimization Areas Seen in Diagnostics
 
-## 4. Scope Boundary
+From the Vercel Lighthouse insights/diagnostics panel:
 
-- This Lighthouse CLI run audited the unauthenticated production entry route (`/login`) in local `vite preview`.
-- Authenticated application routes (`/dashboard`, `/projects`, `/users`, `/audit`, `/reports`, `/settings`) were separately measured via Playwright `PerformanceObserver` telemetry and `@axe-core/playwright` (`100%` pass) in [`performance-and-bundle-report.md`](performance-and-bundle-report.md) and [`accessibility-report.md`](accessibility-report.md).
+- **Main-thread & JS execution time:** Reduce unused JavaScript and heavy main-thread work where possible (though DevTools extensions can also inflate reported JS time).
+- **Render-blocking / Speed Index (`3.1 s`):** Keep above-the-fold styles light and verify network waterfall in clean Incognito runs.
+- **Automated follow-ups:** Ongoing route-level Accessibility (`@axe-core/playwright`) and runtime CLS/LCP checks live in `apps/frontend/e2e/accessibility-performance.spec.ts` (run with `npm run test:e2e`).

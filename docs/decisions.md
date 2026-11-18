@@ -1,56 +1,42 @@
-# Architecture Decision Records (ADRs)
+# Architecture Decisions
 
-This document records key architectural and technical decisions made for the Enterprise Administration Dashboard, including context, alternatives considered, and trade-offs.
+Simple notes explaining the main technical choices in this project and why they were made.
 
----
-
-## ADR-001: Same-Domain `/api` Reverse Proxy Rewrite Architecture
-
-- **Status:** Implemented *(local proxy, edge rewrite + CSP headers, and API middleware configured; live deployed cookie round-trip check pending)* — see [Security Review](reports/security-review.md)
-- **Scope:** `apps/web`, `apps/api`, deployment routing
-
-### Context
-
-The application consists of two deployable units:
-1. `apps/web` — React + TypeScript + Vite SPA.
-2. `apps/api` — Express + MongoDB REST API handling authentication, RBAC, audit trails, and file uploads.
-
-Authentication plans to pair short-lived in-memory JWT access tokens with refresh tokens stored in `httpOnly` cookies. If the frontend (e.g., `*.vercel.app`) calls an API hosted on a separate origin (e.g., another PaaS domain), requests become cross-site:
-- Modern browsers restrict or block third-party cookies (`SameSite=None; Secure`) in Safari ITP, strict privacy modes, and incognito sessions.
-- `SameSite=Lax` and `SameSite=Strict` cookies are not sent on cross-site `fetch`/XHR requests.
-- Cross-origin requests require credentialed CORS with explicit origin maintenance, add preflight (`OPTIONS`) overhead, and force widening `connect-src` in Content-Security-Policy (CSP).
+## ADR-001: Keep Frontend and Backend on the Same Domain (`/api` Proxy)
 
 ### Decision
 
-Route all frontend API requests through a **same-origin `/api` path** (`/api/*`):
+All browser requests go to relative `/api/...` paths (`VITE_API_BASE_URL=/api`):
 
-- **Local Development:** Configure Vite `server.proxy` in `apps/web/vite.config.ts` to forward `/api/*` to the local Express server.
-- **Production:** Configure reverse-proxy rewrites (e.g., `vercel.json` `rewrites`) to forward `/api/:path*` to the deployed `apps/api` origin.
+- **Local development & preview:** `apps/frontend/vite.config.ts` proxies `/api` to `http://localhost:4000`.
+- **Production (Vercel):** `apps/frontend/vercel.json` rewrites `/api/:path*` to the deployed backend API.
 
-### Alternatives Considered
+### Why (Simple Explanation)
 
-1. **Cross-Origin API with CORS + `SameSite=None; Secure` Cookies**
-   - *Rejected:* Fragile against third-party cookie blocking in modern browsers, adds preflight latency, and widens CSRF attack surface compared to `SameSite=Lax`/`Strict`.
-2. **Shared Custom Subdomains (`app.domain.com` and `api.domain.com` with `Domain=.domain.com`)**
-   - *Rejected:* Requires custom DNS configuration, does not work on default PaaS preview domains, and broadens cookie scope across subdomains.
-3. **Storing Refresh Tokens in `localStorage` or `sessionStorage`**
-   - *Rejected:* Exposes session credentials to JavaScript, allowing any XSS vulnerability to steal refresh tokens.
+1. **Authentication cookies work reliably:** Modern browsers block or restrict cross-site cookies (`SameSite=Lax` / third-party cookie rules). Sending API requests through the same domain keeps the `httpOnly` `refresh_token` cookie and `csrf_token` cookie working without special workarounds.
+2. **Simpler client code:** The frontend never needs hardcoded production backend URLs inside API modules.
+3. **Cleaner CORS handling:** Users stay on one origin in the browser, while the backend still validates allowed origins (`FRONTEND_URL`) in `apps/backend/src/config/cors.ts`.
 
-### Consequences & Implementation Requirements
+### Trade-off
 
-**Expected Benefits:**
-- `httpOnly` + `SameSite=Lax` (or `Strict`) cookies operate as first-party cookies under the frontend domain.
-- Removes cross-origin CORS friction and `OPTIONS` preflights from normal SPA calls.
-- Keeps frontend API paths environment-agnostic (`/api/...`) and supports a tighter `connect-src 'self'` CSP.
+- In Vercel, any deployment needs the rewrite destination in `apps/frontend/vercel.json` to match the live backend URL.
 
-**Trade-Offs & Required Configurations:**
-- **Proxy Trust:** `apps/api` must enable `app.set('trust proxy', 1)` so Express accurately reads `X-Forwarded-For` / `X-Forwarded-Proto` for rate limiting and `Secure` cookie decisions.
-- **Cookie Scoping:** Refresh cookies must scope `Path=/api` (or `Path=/api/auth`) and set `Secure` dynamically based on environment/HTTPS so both local HTTP dev and production HTTPS work reliably.
-- **Payload & Timeout Limits:** Reverse-proxy hops enforce request body size and execution timeout limits (e.g., serverless proxy caps); upload limits must respect those constraints or move to direct signed storage URLs if larger uploads are needed.
-- **Defense in Depth:** `apps/api` must still apply security headers (`helmet`), strict origin validation/CSRF protection on cookie-authenticated state-changing endpoints, and explicit CORS allowlists rather than relying solely on proxy routing.
+---
 
-### Verification Plan (Before Building Login)
+## ADR-002: Custom SVG Charts and One Combined Overview Call
 
-Before implementing full authentication flows, deploy `apps/api` with `GET /api/health` and `apps/web` with the `/api` rewrite, set a test cookie from `/api/health`, and verify in browser DevTools that:
-1. `/api/health` succeeds via the frontend domain.
-2. The `Set-Cookie` header passes cleanly through the external rewrite and is stored under the frontend domain.
+### Decision
+
+1. Build dashboard charts with lightweight custom SVG React components inside `apps/frontend/src/features/dashboard/components/` instead of installing a heavy chart library.
+2. Load dashboard cards, deadline alerts, and charts through one endpoint (`GET /api/dashboard/overview`) using `apps/frontend/src/hooks/useDashboardOverview.ts`.
+3. Lazy-load dashboard pages and chart panels (`React.lazy` in `apps/frontend/src/app/App.tsx`).
+
+### Why (Simple Explanation)
+
+1. **Smaller JavaScript bundle:** Heavy chart libraries often add 100–250 kB of extra JavaScript. Custom SVG charts keep `DashboardChartsGrid` small (`18.81 kB` raw / `5.06 kB` gzip) and do not load at all on `/login`.
+2. **Faster dashboard load:** Fetching `/api/dashboard/overview` in one request avoids waiting for 5 separate API round-trips and keeps all dashboard cards in sync.
+3. **Full accessibility & style control:** Custom SVG components use theme colors, readable labels, and keyboard/screen-reader attributes directly.
+
+### Trade-off
+
+- Adding completely new chart types (like zoomable time-series maps) takes slightly more custom code than plugging in a full chart library, though keeping individual breakdown endpoints (`/summary`, `/track-progress`, `/status-breakdown`, `/employee-status`, `/activity-trend`) makes future changes easy.
