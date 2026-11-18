@@ -2,13 +2,13 @@
 
 A plain-English guide to how this project is tested, what each test layer covers, and how to run every check.
 
-## Overview of Automated Tests (63 Total)
+## Overview of Automated Tests (64 Total)
 
 | Layer | Location | Tool | Count | What It Checks |
 | --- | --- | --- | --- | --- |
 | Backend Unit | `apps/backend/tests/` | Node `node --test` + `tsx` | **13 tests (3 files)** | RBAC permissions, password rules, regex escaping, project filtering/sorting, dashboard metric math |
 | Frontend Unit | `apps/frontend/src/lib/`, `features/auth/`, `workers/` | Vitest | **20 tests (6 files)** | Route access checks, `api.ts` retry/refresh behavior, async cookies, date/name formatters, form validators, CSV/JSON export safety |
-| Frontend Integration | `apps/frontend/src/features/` | Vitest + React Testing Library + MSW | **23 tests (5 files)** | Login flow, route guards, Dashboard cards/charts/retry, Projects filters/creation/URL sync, Departments/Clients/Employees drill-downs |
+| Frontend Integration | `apps/frontend/src/features/` | Vitest + React Testing Library + MSW | **24 tests (5 files)** | Login flow, route guards, Dashboard cards/charts/retry, Projects filters/creation/URL sync/searchable multi-page options, Departments/Clients/Employees drill-downs |
 | Browser E2E & A11y | `apps/frontend/e2e/` | Playwright + `@axe-core/playwright` | **3 tests (2 files)** | Redirects, wrong-password alert, project creation, logout, viewer RBAC blocks, WCAG 2.1 AA checks across routes, Core Web Vitals & lazy chunks |
 | Standalone Exercise | `exercises/structured-output-adapter/` | Node `node --test` | **4 tests (1 file)** | Runtime validation, fallback handling, and memoized selector behavior |
 
@@ -40,7 +40,7 @@ npm run test:exercise
 
 ### Frontend Tests (`apps/frontend/`)
 - **Unit (`20` tests):** `routePermissions.test.ts` (`5`), `api.test.ts` (`5`), `formatters.test.ts` (`4`), `cookies.test.ts` (`2`), `validation.test.ts` (`2`), `reportSerializer.test.ts` (`2`).
-- **Integration (`23` tests):** `LoginPage.integration.test.tsx` (`5`), `ProtectedRoute.test.tsx` (`5`), `DashboardPage.integration.test.tsx` (`4`), `WorkspaceDirectories.integration.test.tsx` (`3`), `ProjectsPage.integration.test.tsx` (`6`).
+- **Integration (`24` tests):** `LoginPage.integration.test.tsx` (`5`), `ProtectedRoute.test.tsx` (`5`), `DashboardPage.integration.test.tsx` (`4`), `WorkspaceDirectories.integration.test.tsx` (`3`), `ProjectsPage.integration.test.tsx` (`7`).
 - All integration tests use MSW (`apps/frontend/src/test/mswServer.ts`) to simulate API responses without a real database.
 
 ## Honest Boundaries (What Is Mocked vs Live)

@@ -4,19 +4,19 @@ Simple breakdown of the production build size, code splitting choices, and measu
 
 ## 1. Production Bundle Output (`npm run build:frontend`)
 
-Measured from `vite build` (`2273` modules transformed in `4.81s`):
+Measured from `vite build` (`2273` modules transformed in `9.76s`):
 
 | Asset / Chunk | Raw Size | Gzip Size | Role |
 | --- | --- | --- | --- |
 | `index.html` | `1.22 kB` | `0.53 kB` | HTML entry |
-| `index-*.css` | `79.11 kB` | `12.19 kB` | Tailwind CSS bundle |
+| `index-*.css` | `79.53 kB` | `12.30 kB` | Tailwind CSS bundle |
 | `vendor-react-*.js` | `249.47 kB` | `79.25 kB` | `react`, `react-dom`, `react-router`, `scheduler` |
 | `vendor-data-*.js` | `94.52 kB` | `32.60 kB` | `@tanstack/react-query` and `axios` |
 | `vendor-icons-*.js` | `16.14 kB` | `5.64 kB` | `lucide-react` icons |
 | `index-*.js` | `40.16 kB` | `11.48 kB` | Core app entry shell |
 | `DashboardPage-*.js` | `12.97 kB` | `3.71 kB` | Dashboard page (lazy-loaded) |
 | `DashboardChartsGrid-*.js` | `18.81 kB` | `5.06 kB` | Custom SVG chart cards (lazy-loaded) |
-| Other feature pages (`ProjectsPage`, `DepartmentsPage`, `DirectoryPage`, `ClientsPage`, modals, reports) | `0.27–13.83 kB` each | `0.20–4.24 kB` each | Lazy-loaded per route |
+| Other feature pages (`ProjectsPage`, `DepartmentsPage`, `DirectoryPage`, `ClientsPage`, modals, reports) | `0.27–13.99 kB` each | `0.20–4.27 kB` each | Lazy-loaded per route |
 
 ## 2. How Load Speed Is Kept Fast
 
@@ -30,5 +30,5 @@ Measured from `vite build` (`2273` modules transformed in `4.81s`):
 
 Measured inside Playwright on `vite preview` (`http://127.0.0.1:4173`):
 
-- `/login`: `FCP 368 ms`, `LCP 368 ms`, `CLS 0`, `41` DOM nodes
-- `/dashboard`: `FCP 156 ms`, `LCP 680 ms`, `CLS ~0.004`, `484` DOM nodes
+- `/login`: `FCP 236 ms`, `LCP 236 ms`, `CLS 0`, `41` DOM nodes
+- `/dashboard`: `FCP 144 ms`, `LCP 580 ms`, `CLS 0.004`, `484` DOM nodes

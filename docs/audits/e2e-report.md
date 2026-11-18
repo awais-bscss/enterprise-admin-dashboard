@@ -12,7 +12,7 @@ Summary of Playwright browser tests verifying authentication, role permissions, 
 ## Latest Run Summary
 
 - **Browser:** Desktop Chrome (Playwright Chromium)
-- **Result:** **3 passed / 3 total** (`43.7s`)
+- **Result:** **3 passed / 3 total** (`24.7s`)
 
 ### Test 1: Auth, Projects & RBAC Flow (`auth-projects-rbac.spec.ts`)
 1. Visiting `/audit` while signed out redirects to `/login`.

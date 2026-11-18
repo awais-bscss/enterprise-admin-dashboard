@@ -10,7 +10,7 @@ Reusable hooks separate data fetching, form validation/submission, and URL filte
 - `useClientsWorkspace.ts` — manages client listing and updates
 - `useUsersDirectory.ts` — manages employee directory queries and user updates
 - `useEntityDirectory.ts` — shared helper pattern used by directory workspaces (pagination, filtering, search, summary counts)
-- `useWorkspaceOptions.ts` — loads dropdown options (departments, clients, employees) for forms and filters
+- `useWorkspaceOptions.ts` — loads active dropdown options (departments, clients, employees) across pages if totals exceed 100 items
 - `useAuditLogs.ts` — fetches paginated audit log entries
 - `useReportsWorkspace.ts` — loads report data and triggers CSV/JSON formatting through the Web Worker
 

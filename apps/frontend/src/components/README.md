@@ -10,7 +10,7 @@ Reusable layout, feedback, filter, and modal components shared across all featur
 
 ## Tables, Filters & Navigation Controls
 
-- `AppDropdown.tsx` & `dropdown/` (`DropdownPortal.tsx`, `useDropdownMenuState.ts`) — accessible custom dropdown menu rendered in a portal so menus are not clipped by containers
+- `AppDropdown.tsx` & `dropdown/` (`DropdownPortal.tsx`, `useDropdownMenuState.ts`) — accessible single/multi-select portal dropdowns with built-in search filtering and dark-mode styling
 - `SearchInput.tsx` — shared search field with clear button
 - `PaginationControls.tsx` — accessible page navigation buttons and count label
 - `StatusSummaryCards.tsx` — reusable summary strip above directories
