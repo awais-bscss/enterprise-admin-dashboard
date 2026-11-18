@@ -24,13 +24,6 @@ export default defineConfig({
           if (normalized.includes('/lucide-react/')) {
             return 'vendor-icons';
           }
-          if (
-            normalized.includes('/recharts/') ||
-            normalized.includes('/d3-') ||
-            normalized.includes('/victory-vendor/')
-          ) {
-            return 'vendor-charts';
-          }
           return undefined;
         },
       },

@@ -29,6 +29,18 @@ export const defaultHandlers = [
     }),
   ),
   http.post('*/api/auth/logout', () => HttpResponse.json({ ok: true })),
+  http.get('*/api/dashboard/overview', () =>
+    HttpResponse.json({
+      ok: true,
+      data: {
+        summary: TEST_DASHBOARD_SUMMARY,
+        trackProgress: TEST_TRACK_PROGRESS,
+        statusBreakdown: TEST_STATUS_BREAKDOWN,
+        employeeStatus: TEST_EMPLOYEE_STATUS,
+        activityTrend: TEST_ACTIVITY_TREND,
+      },
+    }),
+  ),
   http.get('*/api/dashboard/summary', () =>
     HttpResponse.json({ ok: true, data: TEST_DASHBOARD_SUMMARY }),
   ),

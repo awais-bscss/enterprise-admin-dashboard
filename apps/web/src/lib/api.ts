@@ -7,7 +7,7 @@ import axios, {
 } from 'axios';
 import type { ApiErrorResponse, ApiSuccessResponse } from '../types/api';
 import type { AuthSessionData } from '../types/auth';
-import { getCookie } from './cookies';
+import { getCookieAsync } from './cookies';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 const CSRF_COOKIE_NAME = 'csrf_token';
@@ -129,7 +129,7 @@ export async function refreshSession(): Promise<AuthSessionData | null> {
   }
 
   sessionRefreshInFlight = (async () => {
-    const csrf = getCookie(CSRF_COOKIE_NAME);
+    const csrf = await getCookieAsync(CSRF_COOKIE_NAME);
     const headers: Record<string, string> = {};
     if (csrf) {
       headers['x-csrf-token'] = csrf;
@@ -166,12 +166,12 @@ export const apiClient: AxiosInstance = axios.create({
   timeout: 15_000,
 });
 
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use(async (config) => {
   const internalConfig = config as InternalRequestConfig;
   const headers = AxiosHeaders.from(internalConfig.headers);
 
   if (internalConfig.withCsrf) {
-    const csrf = getCookie(CSRF_COOKIE_NAME);
+    const csrf = await getCookieAsync(CSRF_COOKIE_NAME);
     if (csrf && !headers.has('x-csrf-token')) {
       headers.set('x-csrf-token', csrf);
     }

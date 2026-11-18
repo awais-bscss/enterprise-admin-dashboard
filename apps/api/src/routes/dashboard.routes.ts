@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getActivityTrend,
   getEmployeeStatus,
+  getOverview,
   getStatusBreakdown,
   getSummary,
   getTrackProgress,
@@ -13,6 +14,7 @@ export const dashboardRouter = Router();
 
 dashboardRouter.use(ensureDatabase, requireAuth, requirePermission("users:read"));
 
+dashboardRouter.get("/overview", getOverview);
 dashboardRouter.get("/summary", getSummary);
 dashboardRouter.get("/track-progress", getTrackProgress);
 dashboardRouter.get("/status-breakdown", getStatusBreakdown);

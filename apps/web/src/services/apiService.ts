@@ -7,6 +7,7 @@ import type {
   ClientItem,
   DashboardActivityTrendData,
   DashboardEmployeeStatusData,
+  DashboardOverviewData,
   DashboardStatusBreakdownData,
   DashboardSummaryData,
   DashboardTrackProgressData,
@@ -142,6 +143,8 @@ export const authService = {
 };
 
 export const dashboardService = {
+  getOverview: (signal?: AbortSignal) =>
+    api.get<DashboardOverviewData>('/dashboard/overview', { signal }),
   getSummary: (signal?: AbortSignal) =>
     api.get<DashboardSummaryData>('/dashboard/summary', { signal }),
   getTrackProgress: (signal?: AbortSignal) =>

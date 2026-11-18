@@ -226,3 +226,11 @@ export interface DashboardEmployeeStatusData {
   statusBreakdown: EmployeeStatusBreakdownItem[];
   roleBreakdown: EmployeeRoleBreakdownItem[];
 }
+
+export interface DashboardOverviewData {
+  summary: DashboardSummaryData;
+  trackProgress: DashboardTrackProgressData;
+  statusBreakdown: DashboardStatusBreakdownData;
+  employeeStatus: DashboardEmployeeStatusData;
+  activityTrend: DashboardActivityTrendData;
+}

@@ -1,15 +1,5 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Building2 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  Cell,
-  LabelList,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { useTheme } from '../../../theme/themeContext';
 import { getChartPalette, SURFACE_TOKENS } from '../../../theme/tokens';
 import type { DepartmentProgressItem } from '../../../types/auth';
@@ -31,26 +21,13 @@ interface BarDatum {
   pillClass: string;
 }
 
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: Array<{ value?: number; payload?: BarDatum }>;
-}
-
-function CoverageTooltip({ active, payload }: CustomTooltipProps) {
-  const item = payload?.[0];
-  if (!active || !item?.payload) return null;
-
-  return (
-    <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-950">
-      <p className="font-semibold text-slate-800 dark:text-slate-100">
-        {item.payload.label} ({item.payload.code})
-      </p>
-      <p className="mt-0.5 text-slate-500 dark:text-slate-400">
-        Avg Progress: {item.value}% ({item.payload.projectCount} projects)
-      </p>
-    </div>
-  );
-}
+const CHART_W = 560;
+const CHART_H = 196;
+const PAD_X = 8;
+const PAD_TOP = 24;
+const PAD_BOTTOM = 26;
+const PLOT_W = CHART_W - PAD_X * 2;
+const PLOT_H = CHART_H - PAD_TOP - PAD_BOTTOM;
 
 export const AccessCoverageChartCard = memo(function AccessCoverageChartCard({
   averageProgress,
@@ -59,6 +36,7 @@ export const AccessCoverageChartCard = memo(function AccessCoverageChartCard({
 }: AccessCoverageChartCardProps) {
   const { isDark } = useTheme();
   const chart = getChartPalette(isDark);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const data: BarDatum[] = departmentProgress.map((item, idx) => {
     const tone = chart.departmentTones[idx % chart.departmentTones.length]!;
@@ -77,6 +55,10 @@ export const AccessCoverageChartCard = memo(function AccessCoverageChartCard({
   const topSummary = [...data]
     .sort((a, b) => b.projectCount - a.projectCount || b.score - a.score)
     .slice(0, 3);
+
+  const slotW = data.length > 0 ? PLOT_W / data.length : PLOT_W;
+  const barW = Math.min(48, Math.max(18, slotW * 0.62));
+  const hoveredItem = hoveredIdx !== null ? data[hoveredIdx] ?? null : null;
 
   return (
     <article className={`${SURFACE_TOKENS.card} flex flex-col justify-between p-5`}>
@@ -114,17 +96,35 @@ export const AccessCoverageChartCard = memo(function AccessCoverageChartCard({
         </ul>
       </div>
 
-      <div className="mt-4 h-48 w-full min-w-0">
+      <div className="relative mt-4 h-48 w-full min-w-0">
         {data.length === 0 ? (
           <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
             No active departments yet.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 20, right: 4, left: 4, bottom: 0 }}
-              barCategoryGap={10}
+          <>
+            {hoveredItem && hoveredIdx !== null ? (
+              <div
+                role="status"
+                style={{
+                  left: `${Math.min(82, Math.max(18, ((hoveredIdx + 0.5) / data.length) * 100))}%`,
+                }}
+                className="pointer-events-none absolute -top-2 z-30 -translate-x-1/2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs whitespace-nowrap shadow-lg dark:border-slate-700 dark:bg-slate-950"
+              >
+                <p className="font-semibold text-slate-800 dark:text-slate-100">
+                  {hoveredItem.label} ({hoveredItem.code})
+                </p>
+                <p className="mt-0.5 text-slate-500 dark:text-slate-400">
+                  Avg Progress: {hoveredItem.score}% ({hoveredItem.projectCount} projects)
+                </p>
+              </div>
+            ) : null}
+
+            <svg
+              viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+              className="h-full w-full overflow-visible select-none"
+              role="img"
+              aria-label={`Average progress by department: ${data.map((d) => `${d.label} ${d.score}%`).join(', ')}`}
             >
               <defs>
                 {chart.departmentTones.map((tone, idx) => (
@@ -150,42 +150,71 @@ export const AccessCoverageChartCard = memo(function AccessCoverageChartCard({
                 ))}
               </defs>
 
-              <XAxis
-                dataKey="label"
-                interval={0}
-                axisLine={false}
-                tickLine={false}
-                tick={{ ...chart.axisTick, fontSize: 10 }}
-              />
-              <YAxis hide domain={[0, 118]} />
-              <Tooltip
-                wrapperStyle={{ zIndex: 40, pointerEvents: 'none' }}
-                cursor={{ fill: chart.tooltipCursor, radius: 12 }}
-                content={<CoverageTooltip />}
-              />
-              <Bar
-                dataKey="score"
-                radius={[12, 12, 12, 12]}
-                minPointSize={6}
-                isAnimationActive={false}
-              >
-                <LabelList
-                  dataKey="score"
-                  position="top"
-                  formatter={(val: unknown) => `${String(val ?? 0)}%`}
-                  style={{ fill: chart.labelFill, fontSize: 10, fontWeight: 600 }}
-                />
-                {data.map((entry) => (
-                  <Cell
+              {data.map((entry, idx) => {
+                const slotX = PAD_X + idx * slotW;
+                const centerX = slotX + slotW / 2;
+                const barX = centerX - barW / 2;
+                const clampedScore = Math.max(0, Math.min(100, entry.score));
+                const barH = Math.max(6, (clampedScore / 100) * PLOT_H);
+                const barY = PAD_TOP + PLOT_H - barH;
+                const isHovered = hoveredIdx === idx;
+
+                return (
+                  <g
                     key={entry.key}
-                    fill={`url(#${entry.patternId})`}
-                    stroke={entry.stroke}
-                    strokeWidth={1.25}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+                    className="cursor-pointer"
+                    onMouseEnter={() => setHoveredIdx(idx)}
+                    onMouseLeave={() => setHoveredIdx(null)}
+                  >
+                    {isHovered ? (
+                      <rect
+                        x={slotX + 2}
+                        y={PAD_TOP - 4}
+                        width={Math.max(8, slotW - 4)}
+                        height={PLOT_H + 8}
+                        rx="12"
+                        fill={chart.tooltipCursor}
+                      />
+                    ) : null}
+
+                    <rect
+                      x={barX}
+                      y={barY}
+                      width={barW}
+                      height={barH}
+                      rx="10"
+                      ry="10"
+                      fill={`url(#${entry.patternId})`}
+                      stroke={entry.stroke}
+                      strokeWidth={isHovered ? 2 : 1.25}
+                    />
+
+                    <text
+                      x={centerX}
+                      y={barY - 6}
+                      textAnchor="middle"
+                      fill={chart.labelFill}
+                      fontSize="10.5"
+                      fontWeight="600"
+                    >
+                      {entry.score}%
+                    </text>
+
+                    <text
+                      x={centerX}
+                      y={PAD_TOP + PLOT_H + 17}
+                      textAnchor="middle"
+                      fill={chart.axisTick.fill}
+                      fontSize="10.5"
+                      fontWeight="500"
+                    >
+                      {entry.label.length > 9 ? entry.code : entry.label}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          </>
         )}
       </div>
     </article>

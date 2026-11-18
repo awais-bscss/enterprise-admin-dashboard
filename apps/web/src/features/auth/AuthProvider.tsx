@@ -3,18 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { preloadRoute } from '../../app/routePreload';
 import { useToast } from '../../components/toast/toastContext';
 import { setAccessToken, setSessionExpiredHandler } from '../../lib/api';
-import { getCookie } from '../../lib/cookies';
+import { getCookieAsync } from '../../lib/cookies';
 import { queryClient } from '../../lib/queryClient';
 import { authService } from '../../services/apiService';
 import type { AuthSessionData, AuthUser, Permission, Role } from '../../types/auth';
 import { AuthContext, type AuthStatus } from './authContext';
+
+function isPublicAuthPath(pathname: string): boolean {
+  return pathname === '/login' || pathname === '/unauthorized';
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>(() =>
-    getCookie('csrf_token') ? 'loading' : 'unauthenticated',
+    typeof window !== 'undefined' && isPublicAuthPath(window.location.pathname)
+      ? 'unauthenticated'
+      : 'loading',
   );
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
@@ -47,26 +53,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearSession, toast]);
 
   useEffect(() => {
-    if (!getCookie('csrf_token')) return;
-
-    preloadRoute(window.location.pathname);
-    preloadRoute('/dashboard');
-
     let active = true;
 
-    authService
-      .refresh()
-      .then((session) => {
+    void (async () => {
+      const csrf = await getCookieAsync('csrf_token');
+      if (!active) return;
+
+      if (!csrf) {
+        clearSession();
+        return;
+      }
+
+      if (!isPublicAuthPath(window.location.pathname)) {
+        preloadRoute(window.location.pathname);
+        preloadRoute('/dashboard');
+      }
+
+      try {
+        const session = await authService.refresh();
         if (!active) return;
         if (session) {
           applySession(session);
         } else {
           clearSession();
         }
-      })
-      .catch(() => {
+      } catch {
         if (active) clearSession();
-      });
+      }
+    })();
 
     return () => {
       active = false;

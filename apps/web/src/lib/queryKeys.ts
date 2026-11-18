@@ -37,6 +37,7 @@ export interface AuditListQueryParams {
 export const queryKeys = {
   dashboard: {
     all: ['dashboard'] as const,
+    overview: ['dashboard', 'overview'] as const,
     summary: ['dashboard', 'summary'] as const,
     trackProgress: ['dashboard', 'track-progress'] as const,
     statusBreakdown: ['dashboard', 'status-breakdown'] as const,

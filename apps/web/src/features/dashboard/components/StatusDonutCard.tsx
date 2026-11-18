@@ -1,6 +1,5 @@
 import { memo, useState, type ReactNode } from 'react';
 import { Hash, Percent } from 'lucide-react';
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { useTheme } from '../../../theme/themeContext';
 import { getChartPalette, SURFACE_TOKENS } from '../../../theme/tokens';
 
@@ -25,25 +24,12 @@ interface StatusDonutCardProps {
   footer?: ReactNode;
 }
 
-interface DonutTooltipProps {
-  active?: boolean;
-  itemNoun: string;
-  payload?: Array<{ payload?: ComputedDonutSlice }>;
-}
-
-function DonutTooltip({ active, itemNoun, payload }: DonutTooltipProps) {
-  const slice = payload?.[0]?.payload;
-  if (!active || !slice) return null;
-
-  return (
-    <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-950">
-      <p className="font-semibold text-slate-800 dark:text-slate-100">{slice.label}</p>
-      <p className="mt-0.5 text-slate-500 dark:text-slate-400">
-        {slice.count} {itemNoun} ({slice.percent}%)
-      </p>
-    </div>
-  );
-}
+const DONUT_SIZE = 180;
+const CENTER = DONUT_SIZE / 2;
+const RING_RADIUS = 64;
+const RING_STROKE = 20;
+const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const SLICE_GAP_ARC = 26;
 
 export const StatusDonutCard = memo(function StatusDonutCard({
   title,
@@ -56,6 +42,7 @@ export const StatusDonutCard = memo(function StatusDonutCard({
   const { isDark } = useTheme();
   const chart = getChartPalette(isDark);
   const [unit, setUnit] = useState<'count' | 'percent'>('count');
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   const safeTotal =
     totalCount > 0 ? totalCount : slices.reduce((sum, item) => sum + item.count, 0);
@@ -66,19 +53,31 @@ export const StatusDonutCard = memo(function StatusDonutCard({
   }));
 
   const nonZeroSlices = computedSlices.filter((slice) => slice.count > 0);
-  const chartData =
-    nonZeroSlices.length > 0
-      ? nonZeroSlices
-      : [
-          {
-            key: 'empty',
-            label: emptyLabel,
-            count: 1,
-            percent: 0,
-            fill: chart.emptySlice,
-            barClass: 'bg-slate-200 dark:bg-slate-700',
-          },
-        ];
+  const hoveredSlice = hoveredKey
+    ? nonZeroSlices.find((slice) => slice.key === hoveredKey) ?? null
+    : null;
+
+  const segments = (() => {
+    if (nonZeroSlices.length === 0) return [];
+    if (nonZeroSlices.length === 1) {
+      return [{ slice: nonZeroSlices[0]!, dashArray: `${CIRCUMFERENCE} 0`, rotateDeg: -90 }];
+    }
+
+    const totalGap = nonZeroSlices.length * SLICE_GAP_ARC;
+    const availableArc = Math.max(40, CIRCUMFERENCE - totalGap);
+    let offsetArc = SLICE_GAP_ARC / 2;
+
+    return nonZeroSlices.map((slice) => {
+      const arcLen = Math.max(4, (slice.count / safeTotal) * availableArc);
+      const rotateDeg = -90 + (offsetArc / CIRCUMFERENCE) * 360;
+      offsetArc += arcLen + SLICE_GAP_ARC;
+      return {
+        slice,
+        dashArray: `${arcLen} ${CIRCUMFERENCE}`,
+        rotateDeg,
+      };
+    });
+  })();
 
   return (
     <article className={`${SURFACE_TOKENS.card} flex flex-col justify-between p-5`}>
@@ -117,7 +116,7 @@ export const StatusDonutCard = memo(function StatusDonutCard({
         </div>
       </div>
 
-      <div className="relative mx-auto my-2 h-44 w-full min-w-0 max-w-[220px]">
+      <div className="relative mx-auto my-2 h-44 w-44">
         <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center">
           <span className="tabular-nums text-2xl font-bold text-slate-900 dark:text-slate-100">
             {safeTotal}
@@ -127,33 +126,57 @@ export const StatusDonutCard = memo(function StatusDonutCard({
           </span>
         </div>
 
-        <div className="relative z-10 h-full w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              {nonZeroSlices.length > 0 ? (
-                <Tooltip
-                  wrapperStyle={{ zIndex: 40, pointerEvents: 'none' }}
-                  content={<DonutTooltip itemNoun={itemNoun} />}
-                />
-              ) : null}
-              <Pie
-                data={chartData}
-                dataKey="count"
-                nameKey="label"
-                innerRadius={54}
-                outerRadius={74}
-                paddingAngle={nonZeroSlices.length > 1 ? 6 : 0}
-                cornerRadius={8}
-                stroke="none"
-                isAnimationActive={false}
-              >
-                {chartData.map((slice) => (
-                  <Cell key={slice.key} fill={slice.fill} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        {hoveredSlice ? (
+          <div
+            role="status"
+            className="pointer-events-none absolute -top-2 left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-200/80 bg-white px-3 py-1.5 text-xs whitespace-nowrap shadow-lg dark:border-slate-700 dark:bg-slate-950"
+          >
+            <p className="font-semibold text-slate-800 dark:text-slate-100">{hoveredSlice.label}</p>
+            <p className="text-slate-500 dark:text-slate-400">
+              {hoveredSlice.count} {itemNoun} ({hoveredSlice.percent}%)
+            </p>
+          </div>
+        ) : null}
+
+        <svg
+          viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
+          className="relative z-10 h-full w-full select-none"
+          role="img"
+          aria-label={
+            nonZeroSlices.length > 0
+              ? `${title}: ${nonZeroSlices.map((s) => `${s.label} ${s.count}`).join(', ')}`
+              : `${title}: ${emptyLabel}`
+          }
+        >
+          {segments.length === 0 ? (
+            <circle
+              cx={CENTER}
+              cy={CENTER}
+              r={RING_RADIUS}
+              fill="none"
+              stroke={chart.emptySlice}
+              strokeWidth={RING_STROKE}
+            />
+          ) : (
+            segments.map(({ slice, dashArray, rotateDeg }) => (
+              <circle
+                key={slice.key}
+                cx={CENTER}
+                cy={CENTER}
+                r={RING_RADIUS}
+                fill="none"
+                stroke={slice.fill}
+                strokeWidth={hoveredKey === slice.key ? RING_STROKE + 2 : RING_STROKE}
+                strokeDasharray={dashArray}
+                strokeLinecap="round"
+                transform={`rotate(${rotateDeg} ${CENTER} ${CENTER})`}
+                className="cursor-pointer transition-[stroke-width] duration-150"
+                onMouseEnter={() => setHoveredKey(slice.key)}
+                onMouseLeave={() => setHoveredKey(null)}
+              />
+            ))
+          )}
+        </svg>
       </div>
 
       <div className="space-y-3 pt-1">
