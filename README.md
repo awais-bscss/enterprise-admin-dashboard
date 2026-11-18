@@ -1,74 +1,96 @@
-# Enterprise Administration Dashboard
+# Enterprise Project & Admin Dashboard
 
-Production-focused Enterprise Administration Dashboard built with a **React + TypeScript + Vite** frontend and an **Express + MongoDB** backend, emphasizing secure authentication and RBAC, resilient API architecture, comprehensive testing, and measured web performance.
+A full-stack admin workspace for managing projects, departments, clients, employees, audit logs, and exportable reports with role-based access control (`admin`, `manager`, `viewer`).
 
 ## Repository Structure
 
 ```text
 .
 ├── apps/
-│   ├── web/                # React + TypeScript + Vite dashboard application
-│   └── api/                # Express + MongoDB backend service
-├── docs/
-│   ├── decisions.md        # Architecture Decision Records (ADRs)
-│   ├── reports/            # Security review and test strategy docs
-│   └── audits/             # Lighthouse, accessibility, performance, bundle, and E2E reports
-├── exercises/              # Standalone technical exercises (isolated from the main app)
-└── package.json            # Root convenience scripts
+│   ├── frontend/                 # React + TypeScript + Vite dashboard app
+│   └── backend/                  # Express + TypeScript + MongoDB API server
+├── docs/                         # Simple architecture, security, test, and audit notes
+├── exercises/
+│   └── structured-output-adapter/ # Standalone TypeScript adapter & Vitest exercise
+├── scripts/
+│   └── dev.mjs                   # Starts backend and frontend together in dev mode
+└── package.json                  # Root workspace scripts
 ```
 
-## Architecture Overview
+## App & Folder Guides
 
-- **Same-Domain `/api` Proxy:** Client API requests target `/api/*` via Vite dev proxy locally and Vercel reverse-proxy rewrites in production (`apps/web/vercel.json`) so `httpOnly` `SameSite=Lax` cookies work cleanly with `connect-src 'self'`. See [Architecture Decisions](docs/decisions.md).
-- **Security-First Auth & RBAC:** Short-lived in-memory JWT access tokens, rotating `httpOnly` refresh cookies with family reuse detection, HMAC double-submit CSRF checks, centralized Axios retry/cancellation/error normalization, and permission-aware routing and UI. See [Security Review](docs/reports/security-review.md).
-- **Quality & Performance Gates:** Vitest, React Testing Library, MSW, Playwright, Axe WCAG 2.1 AA, Lighthouse, and Vite bundle code-splitting implemented and audited. See [Test Strategy](docs/reports/test-strategy.md) and [`docs/audits/`](docs/audits/lighthouse-report.md).
+- Frontend guide: [apps/frontend/README.md](apps/frontend/README.md)
+  - Feature pages: [apps/frontend/src/features/README.md](apps/frontend/src/features/README.md)
+  - Custom hooks: [apps/frontend/src/hooks/README.md](apps/frontend/src/hooks/README.md)
+  - Shared UI components: [apps/frontend/src/components/README.md](apps/frontend/src/components/README.md)
+  - Client & utility helpers: [apps/frontend/src/lib/README.md](apps/frontend/src/lib/README.md)
+- Backend guide: [apps/backend/README.md](apps/backend/README.md)
+- Standalone exercise: [exercises/structured-output-adapter/README.md](exercises/structured-output-adapter/README.md)
 
-## Tech Stack
+## Quick Start (Local Development)
 
-- **Frontend (`apps/web`):** React 19, TypeScript, Vite, Oxlint
-- **Backend (`apps/api`):** Node.js, Express 5, TypeScript, MongoDB (Mongoose)
-- **Testing & Audits:** Vitest, React Testing Library, MSW, Playwright, `@axe-core/playwright`, Lighthouse CLI
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (LTS 20+ recommended)
-- npm (10+)
-- MongoDB Atlas or local MongoDB connection string
-
-### Root Scripts
-
-Each application (`apps/web`, `apps/api`) maintains its own independent `package.json` and `package-lock.json`. From the repository root:
+### 1. Install dependencies
 
 ```bash
-# Install dependencies
-npm run install:web
-npm run install:api
-
-# Start development servers
-npm run dev:api
-npm run dev:web
-
-# Typecheck, lint, test, and build
-npm run typecheck:api
-npm run compile:api
-npm run lint:web
-npm run test:web
-npm run test:e2e
-npm run test:exercise
-npm run build:web
+npm install
+npm run install:backend
+npm run install:frontend
 ```
 
-> **Environment Variables:** Copy `apps/api/.env.example` to `apps/api/.env` (and optionally `apps/web/.env.example` to `apps/web/.env`) for local development. Never commit real `.env` files or secrets.
+### 2. Configure environment files
 
-## Documentation & Reports
+Copy the example env files and fill in your local values (MongoDB connection string, JWT secrets, and seed credentials):
 
-- [Architecture Decision Records](docs/decisions.md)
-- [Security Review](docs/reports/security-review.md)
-- [Test Strategy](docs/reports/test-strategy.md)
-- [Lighthouse Audit Report](docs/audits/lighthouse-report.md)
-- [Accessibility Audit Report](docs/audits/accessibility-report.md)
-- [Performance & Bundle Report](docs/audits/performance-and-bundle-report.md)
-- [End-to-End Verification Report](docs/audits/e2e-report.md)
-- [Standalone Structured Output Adapter Exercise](exercises/structured-output-adapter/README.md)
+```bash
+cp apps/backend/.env.example apps/backend/.env
+cp apps/frontend/.env.example apps/frontend/.env.development
+```
+
+- Backend variables are documented in [apps/backend/README.md](apps/backend/README.md).
+- Frontend variables are documented in [apps/frontend/README.md](apps/frontend/README.md).
+
+### 3. Seed demo users and workspace data (first run)
+
+```bash
+npm run seed:backend
+```
+
+### 4. Start both apps together
+
+```bash
+npm run dev
+```
+
+- Frontend runs on `http://localhost:5173`
+- Backend runs on `http://localhost:4000`
+- During local development, Vite proxies `/api/*` requests from `:5173` to `:4000` so login and refresh cookies stay on the same origin.
+
+## Common Root Scripts
+
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Run backend and frontend together |
+| `npm run dev:backend` | Run backend only (`tsx watch`) |
+| `npm run dev:frontend` | Run frontend only (`vite`) |
+| `npm run build:frontend` | Type-check and build frontend (`apps/frontend/dist`) |
+| `npm run lint:frontend` | Run `oxlint` on frontend code |
+| `npm run typecheck:backend` | Type-check backend TypeScript |
+| `npm run compile:backend` | Compile backend TypeScript (`tsc`) |
+| `npm run test:backend` | Run Node built-in unit tests for backend helpers |
+| `npm run test:frontend` | Run Vitest unit & integration tests for frontend |
+| `npm run test:e2e` | Run Playwright end-to-end & accessibility tests |
+| `npm run test:exercise` | Run Vitest suite for the standalone exercise |
+| `npm run seed:backend` | Seed sample data into MongoDB |
+
+> Existing `:api` and `:web` aliases (`dev:api`, `dev:web`, etc.) are also kept in [package.json](package.json) so older scripts continue to work.
+
+## Documentation Index
+
+- Architecture decisions: [docs/decisions.md](docs/decisions.md)
+- Security overview: [docs/reports/security-review.md](docs/reports/security-review.md)
+- Testing overview: [docs/reports/test-strategy.md](docs/reports/test-strategy.md)
+- Audit notes:
+  - [docs/audits/accessibility-report.md](docs/audits/accessibility-report.md)
+  - [docs/audits/e2e-report.md](docs/audits/e2e-report.md)
+  - [docs/audits/performance-and-bundle-report.md](docs/audits/performance-and-bundle-report.md)
+  - [docs/audits/lighthouse-report.md](docs/audits/lighthouse-report.md)
