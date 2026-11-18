@@ -1,8 +1,10 @@
 import type { Request, Response } from "express";
 import { AUDIT_RESOURCES, AuditLog } from "../models/AuditLog.js";
 import { parsePaginationParams, resolvePaginatedItems } from "../utils/pagination.js";
+import { escapeRegex } from "../utils/query.js";
 
 export async function listAuditLogs(req: Request, res: Response): Promise<void> {
+  const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const resourceType =
     typeof req.query.resourceType === "string" ? req.query.resourceType.trim() : "";
   const { page, limit } = parsePaginationParams(req.query as Record<string, unknown>, {
@@ -11,6 +13,15 @@ export async function listAuditLogs(req: Request, res: Response): Promise<void> 
   });
 
   const filter: Record<string, unknown> = {};
+  if (query) {
+    const regex = new RegExp(escapeRegex(query), "i");
+    filter.$or = [
+      { actorName: regex },
+      { actorEmail: regex },
+      { action: regex },
+      { summary: regex },
+    ];
+  }
   if (AUDIT_RESOURCES.includes(resourceType as (typeof AUDIT_RESOURCES)[number])) {
     filter.resourceType = resourceType;
   }

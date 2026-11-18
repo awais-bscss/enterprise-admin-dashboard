@@ -43,6 +43,9 @@ export function UserFormModal({
     setRole,
     status,
     setStatus,
+    departmentId,
+    setDepartmentId,
+    departments,
     submitting,
     error,
     handleSubmit,
@@ -66,12 +69,12 @@ export function UserFormModal({
                 id="user-modal-title"
                 className="text-base font-bold text-slate-900 dark:text-slate-100"
               >
-                {isEditing ? 'Edit Team Member' : 'Add Team Member'}
+                {isEditing ? 'Edit Employee' : 'Add Employee'}
               </h2>
               <p className="text-xs text-slate-400">
                 {isEditing
-                  ? 'Update account details, RBAC tier, or reset password.'
-                  : 'Create an enterprise account with role-scoped access.'}
+                  ? 'Update employee details, department, role, or reset password.'
+                  : 'Create an employee account with department and role-scoped access.'}
               </p>
             </div>
           </div>
@@ -169,6 +172,29 @@ export function UserFormModal({
                 ariaLabel="Status"
               />
             </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="user-modal-dept"
+              className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300"
+            >
+              Department
+            </label>
+            <AppDropdown
+              id="user-modal-dept"
+              variant="field"
+              value={departmentId}
+              options={[
+                { value: '', label: 'Unassigned' },
+                ...departments.map((dept) => ({
+                  value: dept.id,
+                  label: `${dept.name} (${dept.code})`,
+                })),
+              ]}
+              onChange={setDepartmentId}
+              ariaLabel="Department"
+            />
           </div>
 
           <div>

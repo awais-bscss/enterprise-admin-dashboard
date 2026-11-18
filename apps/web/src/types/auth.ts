@@ -5,13 +5,16 @@ export type Permission =
   | 'users:write'
   | 'projects:read'
   | 'projects:write'
+  | 'departments:read'
+  | 'departments:write'
+  | 'clients:read'
+  | 'clients:write'
   | 'audit:read'
-  | 'reports:export'
-  | 'settings:manage';
+  | 'reports:export';
 
-export type ProjectCategory = 'development' | 'design' | 'testing' | 'security';
 export type ProjectStatus = 'upcoming' | 'in_progress' | 'completed';
 export type ProjectPriority = 'low' | 'medium' | 'high';
+export type EntityStatus = 'active' | 'inactive';
 
 export interface AuthUser {
   id: string;
@@ -27,6 +30,18 @@ export interface AuthSessionData {
   user: AuthUser;
 }
 
+export interface DepartmentRef {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface ClientRef {
+  id: string;
+  name: string;
+  company: string;
+}
+
 export interface ProjectOwnerSummary {
   id: string;
   name: string;
@@ -38,21 +53,47 @@ export interface ProjectItem {
   id: string;
   name: string;
   description: string;
-  category: ProjectCategory;
+  department: DepartmentRef | null;
+  client: ClientRef | null;
   status: ProjectStatus;
   progress: number;
-  tasksTotal: number;
-  tasksCompleted: number;
   priority: ProjectPriority;
   dueDate: string | null;
   owner: ProjectOwnerSummary;
+  members?: ProjectOwnerSummary[];
   createdAt: string;
   updatedAt: string;
 }
 
-export interface RoleBreakdownItem {
-  role: Role;
-  count: number;
+export interface DepartmentItem {
+  id: string;
+  name: string;
+  code: string;
+  headName: string;
+  description: string;
+  status: EntityStatus;
+  employeeCount?: number;
+  projectCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClientItem {
+  id: string;
+  name: string;
+  company: string;
+  email: string;
+  phone: string;
+  status: EntityStatus;
+  projectCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EntityStatusStats {
+  total: number;
+  active: number;
+  inactive: number;
 }
 
 export interface ProjectStatusBreakdownItem {
@@ -60,12 +101,12 @@ export interface ProjectStatusBreakdownItem {
   count: number;
 }
 
-export interface CategoryProgressItem {
-  category: ProjectCategory;
+export interface DepartmentProgressItem {
+  id: string;
+  code: string;
   label: string;
   avgProgress: number;
   projectCount: number;
-  tasksTotal: number;
 }
 
 export interface ActivityTrendPoint {
@@ -74,16 +115,21 @@ export interface ActivityTrendPoint {
   mutations: number;
 }
 
-export interface RecentProjectSummary {
+export type DeadlineUrgency = 'critical' | 'warning' | 'upcoming';
+
+export interface DeadlineAlertItem {
   id: string;
   name: string;
-  category: ProjectCategory;
+  departmentName: string;
+  departmentCode: string | null;
   status: ProjectStatus;
   priority: ProjectPriority;
   progress: number;
-  tasksTotal: number;
-  tasksCompleted: number;
+  dueDate: string;
+  daysRemaining: number;
+  urgency: DeadlineUrgency;
   ownerName: string;
+  teamCount?: number;
 }
 
 export interface DirectoryPreviewUser {
@@ -92,6 +138,7 @@ export interface DirectoryPreviewUser {
   email: string;
   role: Role;
   status: 'active' | 'suspended';
+  department?: DepartmentRef | null;
   projectCount?: number;
   createdAt?: string;
 }
@@ -118,43 +165,64 @@ export interface AuditLogItem {
   actorEmail: string;
   actorRole: string;
   action: string;
-  resourceType: 'auth' | 'project' | 'user' | 'settings' | 'report';
+  resourceType: 'auth' | 'project' | 'department' | 'client' | 'user' | 'report';
   resourceId: string | null;
   summary: string;
   createdAt: string;
 }
 
-export interface WorkspaceSettingsData {
-  organizationName: string;
-  defaultNewUserRole: 'manager' | 'viewer';
-  sessionTimeoutMinutes: number;
-  enforceStrongPasswords: boolean;
-  auditRetentionDays: number;
-  updatedByName: string;
-  updatedAt: string;
-}
-
-export interface DashboardOverviewData {
+export interface DashboardSummaryData {
   stats: {
     totalUsers: number;
     activeUsers: number;
     suspendedUsers: number;
     activeSessions: number | null;
+    totalDepartments: number;
+    activeDepartments: number;
+    totalClients: number;
+    activeClients: number;
     totalProjects: number;
     activeProjects: number;
     inProgressProjects: number;
     completedProjects: number;
     upcomingProjects: number;
-    totalTasks: number;
-    completedTasks: number;
     averageProgress: number;
   };
-  roleBreakdown: RoleBreakdownItem[];
-  projectStatusBreakdown: ProjectStatusBreakdownItem[];
-  categoryProgress: CategoryProgressItem[];
-  activityTrend: ActivityTrendPoint[];
-  recentProjects: RecentProjectSummary[];
+  deadlineAlerts: DeadlineAlertItem[];
   directoryPreview: DirectoryPreviewUser[];
   role: Role;
   permissions: Permission[];
+}
+
+export interface DashboardTrackProgressData {
+  averageProgress: number;
+  totalProjects: number;
+  departmentProgress: DepartmentProgressItem[];
+}
+
+export interface DashboardStatusBreakdownData {
+  totalProjects: number;
+  projectStatusBreakdown: ProjectStatusBreakdownItem[];
+}
+
+export interface DashboardActivityTrendData {
+  activityTrend: ActivityTrendPoint[];
+}
+
+export interface EmployeeStatusBreakdownItem {
+  status: 'active' | 'suspended';
+  count: number;
+}
+
+export interface EmployeeRoleBreakdownItem {
+  role: Role;
+  count: number;
+}
+
+export interface DashboardEmployeeStatusData {
+  totalEmployees: number;
+  activeEmployees: number;
+  suspendedEmployees: number;
+  statusBreakdown: EmployeeStatusBreakdownItem[];
+  roleBreakdown: EmployeeRoleBreakdownItem[];
 }

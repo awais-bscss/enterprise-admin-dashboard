@@ -98,7 +98,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <aside
           aria-label="Notifications"
           aria-live="polite"
-          className="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2.5"
+          className="pointer-events-none fixed top-4 left-1/2 z-[60] flex w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 flex-col gap-2.5"
         >
           {toasts.map((item) => {
             const style = VARIANT_STYLES[item.variant];

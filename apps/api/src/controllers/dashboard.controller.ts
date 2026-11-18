@@ -1,22 +1,41 @@
 import type { Request, Response } from "express";
+import type mongoose from "mongoose";
 import { ROLES, type Role } from "../config/rbac.js";
 import { AuditLog } from "../models/AuditLog.js";
-import {
-  PROJECT_CATEGORIES,
-  PROJECT_STATUSES,
-  Project,
-  type ProjectCategory,
-  type ProjectStatus,
-} from "../models/Project.js";
+import { Client } from "../models/Client.js";
+import { Department } from "../models/Department.js";
+import { PROJECT_STATUSES, Project, type ProjectStatus } from "../models/Project.js";
 import { RefreshToken } from "../models/RefreshToken.js";
 import { User } from "../models/User.js";
 
-const CATEGORY_LABELS: Record<ProjectCategory, string> = {
-  development: "Development",
-  design: "Design",
-  testing: "Testing",
-  security: "Security",
-};
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DEADLINE_ALERT_HORIZON_DAYS = 14;
+
+type DeadlineUrgency = "critical" | "warning" | "upcoming";
+
+function resolveDeadlineAlertMeta(
+  dueDate: Date,
+  todayUtcMs: number,
+): { daysRemaining: number; urgency: DeadlineUrgency } {
+  const dueUtcMs = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
+  const daysRemaining = Math.round((dueUtcMs - todayUtcMs) / DAY_MS);
+  const urgency: DeadlineUrgency =
+    daysRemaining <= 3 ? "critical" : daysRemaining <= 7 ? "warning" : "upcoming";
+  return { daysRemaining, urgency };
+}
+
+function summarizeStatusCounts(
+  rows: Array<{ _id: string | { status?: string } | null; count: number }>,
+): { total: number; active: number } {
+  let total = 0;
+  let active = 0;
+  for (const row of rows) {
+    total += row.count;
+    const status = typeof row._id === "string" ? row._id : row._id?.status;
+    if (status === "active") active += row.count;
+  }
+  return { total, active };
+}
 
 function buildRecentDayKeys(days: number): { key: string; label: string }[] {
   const result: { key: string; label: string }[] = [];
@@ -30,37 +49,61 @@ function buildRecentDayKeys(days: number): { key: string; label: string }[] {
   return result;
 }
 
-export async function getOverview(req: Request, res: Response): Promise<void> {
+export async function getSummary(req: Request, res: Response): Promise<void> {
   const auth = req.auth!;
-  const fiveDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
   const includeActiveSessions = auth.permissions.includes("audit:read");
+  const now = new Date();
+  const todayUtcMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const horizonEnd = new Date(todayUtcMs + (DEADLINE_ALERT_HORIZON_DAYS + 1) * DAY_MS);
 
   const [
     userStatsAgg,
+    departmentStatsAgg,
+    clientStatsAgg,
     directoryPreview,
-    projectMetrics,
-    recentProjects,
-    auditRecent,
+    projectStatsAgg,
+    deadlineAlertRows,
     activeSessions,
   ] = await Promise.all([
-    User.aggregate<{ _id: { role: Role; status: string }; count: number }>([
-      { $group: { _id: { role: "$role", status: "$status" }, count: { $sum: 1 } } },
+    User.aggregate<{ _id: { status: string }; count: number }>([
+      { $group: { _id: { status: "$status" }, count: { $sum: 1 } } },
+    ]),
+    Department.aggregate<{ _id: string; count: number }>([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    Client.aggregate<{ _id: string; count: number }>([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
     User.find().select("name email role status").sort({ createdAt: 1 }).limit(4).lean(),
-    Project.find().select("status category progress tasksTotal tasksCompleted").lean(),
+    Project.aggregate<{ _id: ProjectStatus; count: number; progressSum: number }>([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+          progressSum: { $sum: "$progress" },
+        },
+      },
+    ]),
     Project.aggregate<{
       _id: unknown;
       name: string;
-      category: string;
       status: string;
       priority: string;
       progress: number;
-      tasksTotal: number;
-      tasksCompleted: number;
+      dueDate: Date;
       ownerName: string;
+      teamCount: number;
+      departmentName: string;
+      departmentCode: string | null;
     }>([
-      { $sort: { updatedAt: -1 } },
-      { $limit: 4 },
+      {
+        $match: {
+          status: { $ne: "completed" },
+          dueDate: { $ne: null, $lt: horizonEnd },
+        },
+      },
+      { $sort: { dueDate: 1 } },
+      { $limit: 6 },
       {
         $lookup: {
           from: User.collection.name,
@@ -71,97 +114,190 @@ export async function getOverview(req: Request, res: Response): Promise<void> {
         },
       },
       {
+        $lookup: {
+          from: Department.collection.name,
+          localField: "departmentId",
+          foreignField: "_id",
+          pipeline: [{ $project: { name: 1, code: 1 } }],
+          as: "departmentDoc",
+        },
+      },
+      {
         $project: {
           name: 1,
-          category: 1,
           status: 1,
           priority: 1,
           progress: 1,
-          tasksTotal: 1,
-          tasksCompleted: 1,
+          dueDate: 1,
           ownerName: { $ifNull: [{ $arrayElemAt: ["$ownerDoc.name", 0] }, "Member"] },
+          teamCount: { $add: [1, { $size: { $ifNull: ["$memberIds", []] } }] },
+          departmentName: {
+            $ifNull: [{ $arrayElemAt: ["$departmentDoc.name", 0] }, "General"],
+          },
+          departmentCode: { $ifNull: [{ $arrayElemAt: ["$departmentDoc.code", 0] }, null] },
         },
       },
     ]),
-    AuditLog.find({ createdAt: { $gte: fiveDaysAgo } })
-      .select("action resourceType createdAt")
-      .lean(),
     includeActiveSessions
       ? RefreshToken.countDocuments({ revokedAt: null, expiresAt: { $gt: new Date() } })
       : Promise.resolve(null),
   ]);
 
-  let totalUsers = 0;
-  let activeUsers = 0;
-  const roleCountMap = new Map<Role, number>();
-  for (const row of userStatsAgg) {
-    totalUsers += row.count;
-    if (row._id.status === "active") {
-      activeUsers += row.count;
-    }
-    roleCountMap.set(row._id.role, (roleCountMap.get(row._id.role) ?? 0) + row.count);
-  }
-  const roleBreakdown = ROLES.map((role) => ({
-    role,
-    count: roleCountMap.get(role) ?? 0,
-  }));
+  const { total: totalUsers, active: activeUsers } = summarizeStatusCounts(userStatsAgg);
+  const { total: totalDepartments, active: activeDepartments } =
+    summarizeStatusCounts(departmentStatsAgg);
+  const { total: totalClients, active: activeClients } = summarizeStatusCounts(clientStatsAgg);
 
-  const statusMap = new Map<ProjectStatus, number>();
-  for (const status of PROJECT_STATUSES) {
-    statusMap.set(status, 0);
-  }
-
-  let totalTasks = 0;
-  let completedTasks = 0;
+  let completedProjects = 0;
+  let inProgressProjects = 0;
+  let upcomingProjects = 0;
   let progressSum = 0;
 
-  const categoryStats = new Map<
-    ProjectCategory,
-    { progressSum: number; count: number; tasksTotal: number }
-  >();
-  for (const cat of PROJECT_CATEGORIES) {
-    categoryStats.set(cat, { progressSum: 0, count: 0, tasksTotal: 0 });
+  for (const row of projectStatsAgg) {
+    progressSum += row.progressSum;
+    if (row._id === "completed") completedProjects += row.count;
+    else if (row._id === "in_progress") inProgressProjects += row.count;
+    else if (row._id === "upcoming") upcomingProjects += row.count;
   }
 
-  for (const project of projectMetrics) {
-    const status = project.status as ProjectStatus;
-    statusMap.set(status, (statusMap.get(status) ?? 0) + 1);
-
-    totalTasks += project.tasksTotal;
-    completedTasks += project.tasksCompleted;
-    progressSum += project.progress;
-
-    const cat = project.category as ProjectCategory;
-    const entry = categoryStats.get(cat);
-    if (entry) {
-      entry.progressSum += project.progress;
-      entry.count += 1;
-      entry.tasksTotal += project.tasksTotal;
-    }
-  }
-
-  const totalProjects = projectMetrics.length;
-  const completedProjects = statusMap.get("completed") ?? 0;
-  const inProgressProjects = statusMap.get("in_progress") ?? 0;
-  const upcomingProjects = statusMap.get("upcoming") ?? 0;
+  const totalProjects = completedProjects + inProgressProjects + upcomingProjects;
   const activeProjects = inProgressProjects + upcomingProjects;
   const averageProgress = totalProjects > 0 ? Math.round(progressSum / totalProjects) : 0;
 
-  const projectStatusBreakdown = PROJECT_STATUSES.map((status) => ({
-    status,
-    count: statusMap.get(status) ?? 0,
-  }));
+  res.status(200).json({
+    ok: true,
+    data: {
+      stats: {
+        totalUsers,
+        activeUsers,
+        suspendedUsers: Math.max(0, totalUsers - activeUsers),
+        activeSessions,
+        totalDepartments,
+        activeDepartments,
+        totalClients,
+        activeClients,
+        totalProjects,
+        activeProjects,
+        inProgressProjects,
+        completedProjects,
+        upcomingProjects,
+        averageProgress,
+      },
+      deadlineAlerts: deadlineAlertRows.map((project) => {
+        const meta = resolveDeadlineAlertMeta(new Date(project.dueDate), todayUtcMs);
+        return {
+          id: String(project._id),
+          name: project.name,
+          departmentName: project.departmentName,
+          departmentCode: project.departmentCode,
+          status: project.status,
+          priority: project.priority,
+          progress: project.progress,
+          dueDate: new Date(project.dueDate).toISOString(),
+          daysRemaining: meta.daysRemaining,
+          urgency: meta.urgency,
+          ownerName: project.ownerName,
+          teamCount: project.teamCount ?? 1,
+        };
+      }),
+      directoryPreview: directoryPreview.map((item) => ({
+        id: String(item._id),
+        name: item.name,
+        email: item.email,
+        role: item.role as Role,
+        status: item.status,
+      })),
+      role: auth.role,
+      permissions: auth.permissions,
+    },
+  });
+}
 
-  const categoryProgress = PROJECT_CATEGORIES.map((category) => {
-    const entry = categoryStats.get(category)!;
+export async function getTrackProgress(_req: Request, res: Response): Promise<void> {
+  const [departments, projectRows] = await Promise.all([
+    Department.find({ status: "active" })
+      .select("_id name code")
+      .sort({ createdAt: 1, name: 1 })
+      .lean(),
+    Project.aggregate<{
+      _id: mongoose.Types.ObjectId | null;
+      count: number;
+      progressSum: number;
+    }>([
+      {
+        $group: {
+          _id: "$departmentId",
+          count: { $sum: 1 },
+          progressSum: { $sum: "$progress" },
+        },
+      },
+    ]),
+  ]);
+
+  const statsByDept = new Map<string, { count: number; progressSum: number }>();
+  let totalProjects = 0;
+  let totalProgressSum = 0;
+
+  for (const row of projectRows) {
+    totalProjects += row.count;
+    totalProgressSum += row.progressSum;
+    if (row._id) {
+      statsByDept.set(String(row._id), { count: row.count, progressSum: row.progressSum });
+    }
+  }
+
+  const departmentProgress = departments.map((dept) => {
+    const entry = statsByDept.get(String(dept._id));
+    const count = entry?.count ?? 0;
+    const sum = entry?.progressSum ?? 0;
     return {
-      category,
-      label: CATEGORY_LABELS[category],
-      avgProgress: entry.count > 0 ? Math.round(entry.progressSum / entry.count) : 0,
-      projectCount: entry.count,
-      tasksTotal: entry.tasksTotal,
+      id: String(dept._id),
+      code: dept.code,
+      label: dept.name,
+      avgProgress: count > 0 ? Math.round(sum / count) : 0,
+      projectCount: count,
     };
   });
+
+  const averageProgress = totalProjects > 0 ? Math.round(totalProgressSum / totalProjects) : 0;
+
+  res.status(200).json({
+    ok: true,
+    data: {
+      averageProgress,
+      totalProjects,
+      departmentProgress,
+    },
+  });
+}
+
+export async function getStatusBreakdown(_req: Request, res: Response): Promise<void> {
+  const rows = await Project.aggregate<{ _id: ProjectStatus; count: number }>([
+    { $group: { _id: "$status", count: { $sum: 1 } } },
+  ]);
+
+  const statusMap = new Map(rows.map((row) => [row._id, row.count]));
+  let totalProjects = 0;
+  const projectStatusBreakdown = PROJECT_STATUSES.map((status) => {
+    const count = statusMap.get(status) ?? 0;
+    totalProjects += count;
+    return { status, count };
+  });
+
+  res.status(200).json({
+    ok: true,
+    data: {
+      totalProjects,
+      projectStatusBreakdown,
+    },
+  });
+}
+
+export async function getActivityTrend(_req: Request, res: Response): Promise<void> {
+  const fiveDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+  const auditRecent = await AuditLog.find({ createdAt: { $gte: fiveDaysAgo } })
+    .select("action createdAt")
+    .lean();
 
   const dayBuckets = buildRecentDayKeys(5);
   const bucketCounts = new Map<string, { signIns: number; mutations: number }>();
@@ -192,44 +328,48 @@ export async function getOverview(req: Request, res: Response): Promise<void> {
   res.status(200).json({
     ok: true,
     data: {
-      stats: {
-        totalUsers,
-        activeUsers,
-        suspendedUsers: Math.max(0, totalUsers - activeUsers),
-        activeSessions,
-        totalProjects,
-        activeProjects,
-        inProgressProjects,
-        completedProjects,
-        upcomingProjects,
-        totalTasks,
-        completedTasks,
-        averageProgress,
-      },
-      roleBreakdown,
-      projectStatusBreakdown,
-      categoryProgress,
       activityTrend,
-      recentProjects: recentProjects.map((project) => ({
-        id: String(project._id),
-        name: project.name,
-        category: project.category,
-        status: project.status,
-        priority: project.priority,
-        progress: project.progress,
-        tasksTotal: project.tasksTotal,
-        tasksCompleted: project.tasksCompleted,
-        ownerName: project.ownerName,
+    },
+  });
+}
+
+export async function getEmployeeStatus(_req: Request, res: Response): Promise<void> {
+  const rows = await User.aggregate<{
+    _id: { status: string; role: Role };
+    count: number;
+  }>([
+    {
+      $group: {
+        _id: { status: "$status", role: "$role" },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  let activeEmployees = 0;
+  let suspendedEmployees = 0;
+  const roleCountMap = new Map<Role, number>();
+
+  for (const row of rows) {
+    if (row._id.status === "active") activeEmployees += row.count;
+    else if (row._id.status === "suspended") suspendedEmployees += row.count;
+    roleCountMap.set(row._id.role, (roleCountMap.get(row._id.role) ?? 0) + row.count);
+  }
+
+  res.status(200).json({
+    ok: true,
+    data: {
+      totalEmployees: activeEmployees + suspendedEmployees,
+      activeEmployees,
+      suspendedEmployees,
+      statusBreakdown: [
+        { status: "active", count: activeEmployees },
+        { status: "suspended", count: suspendedEmployees },
+      ],
+      roleBreakdown: ROLES.map((role) => ({
+        role,
+        count: roleCountMap.get(role) ?? 0,
       })),
-      directoryPreview: directoryPreview.map((item) => ({
-        id: String(item._id),
-        name: item.name,
-        email: item.email,
-        role: item.role,
-        status: item.status,
-      })),
-      role: auth.role,
-      permissions: auth.permissions,
     },
   });
 }

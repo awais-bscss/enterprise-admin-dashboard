@@ -6,9 +6,12 @@ export const PERMISSIONS = [
   "users:write",
   "projects:read",
   "projects:write",
+  "departments:read",
+  "departments:write",
+  "clients:read",
+  "clients:write",
   "audit:read",
   "reports:export",
-  "settings:manage",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -18,12 +21,25 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "users:write",
     "projects:read",
     "projects:write",
+    "departments:read",
+    "departments:write",
+    "clients:read",
+    "clients:write",
     "audit:read",
     "reports:export",
-    "settings:manage",
   ],
-  manager: ["users:read", "projects:read", "projects:write", "audit:read", "reports:export"],
-  viewer: ["users:read", "projects:read"],
+  manager: [
+    "users:read",
+    "projects:read",
+    "projects:write",
+    "departments:read",
+    "departments:write",
+    "clients:read",
+    "clients:write",
+    "audit:read",
+    "reports:export",
+  ],
+  viewer: ["users:read", "projects:read", "departments:read", "clients:read"],
 };
 
 export function getPermissionsForRole(role: Role): Permission[] {

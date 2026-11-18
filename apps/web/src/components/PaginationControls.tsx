@@ -52,6 +52,14 @@ export function PaginationControls({
   const endItem = Math.min(page * limit, total);
   const sequence = buildPageSequence(page, totalPages);
 
+  function selectPage(nextPage: number) {
+    if (nextPage === page) return;
+    onPageChange(nextPage);
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
   return (
     <nav
       aria-label={`${itemLabel} pagination`}
@@ -94,7 +102,7 @@ export function PaginationControls({
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
-          onClick={() => onPageChange(Math.max(1, page - 1))}
+          onClick={() => selectPage(Math.max(1, page - 1))}
           disabled={page <= 1}
           className={`${BUTTON_TOKENS.secondaryPill} px-3 py-1.5`}
         >
@@ -115,7 +123,7 @@ export function PaginationControls({
             <button
               key={entry}
               type="button"
-              onClick={() => onPageChange(entry)}
+              onClick={() => selectPage(entry)}
               aria-current={entry === page ? 'page' : undefined}
               className={`tabular-nums h-8 min-w-8 cursor-pointer rounded-full px-2.5 text-xs font-semibold transition ${
                 entry === page
@@ -130,7 +138,7 @@ export function PaginationControls({
 
         <button
           type="button"
-          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          onClick={() => selectPage(Math.min(totalPages, page + 1))}
           disabled={page >= totalPages}
           className={`${BUTTON_TOKENS.secondaryPill} px-3 py-1.5`}
         >

@@ -3,14 +3,15 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useToast } from '../components/toast/toastContext';
 import { getErrorMessage } from '../lib/errors';
 import { invalidateWorkspaceQueries, queryKeys } from '../lib/queryKeys';
+import { projectsService } from '../services/apiService';
+import type { PaginationMeta } from '../types/api';
+import type { ProjectItem, ProjectsWorkspaceStats } from '../types/auth';
 import {
   readPositiveIntParam,
   readStringParam,
   useUrlQueryUpdater,
 } from './useUrlQueryState';
-import { projectsService } from '../services/apiService';
-import type { PaginationMeta } from '../types/api';
-import type { ProjectItem, ProjectStatus, ProjectsWorkspaceStats } from '../types/auth';
+import { useActiveClients, useActiveDepartments, useActiveEmployees } from './useWorkspaceOptions';
 
 const EMPTY_STATS: ProjectsWorkspaceStats = {
   total: 0,
@@ -19,8 +20,8 @@ const EMPTY_STATS: ProjectsWorkspaceStats = {
   upcoming: 0,
 };
 
-const QUERY_DEFAULTS = { page: 1, limit: 6 } as const;
-const ALLOWED_LIMITS = [6, 9, 12] as const;
+const QUERY_DEFAULTS = { page: 1, limit: 8 } as const;
+const ALLOWED_LIMITS = [8, 15, 25] as const;
 
 export function useProjectsWorkspace() {
   const queryClient = useQueryClient();
@@ -30,7 +31,10 @@ export function useProjectsWorkspace() {
 
   const search = readStringParam(searchParams, 'q');
   const statusFilter = readStringParam(searchParams, 'status');
-  const categoryFilter = readStringParam(searchParams, 'category');
+  const departmentFilter = readStringParam(searchParams, 'departmentId');
+  const clientFilter = readStringParam(searchParams, 'clientId');
+  const ownerFilter = readStringParam(searchParams, 'ownerId');
+  const sort = readStringParam(searchParams, 'sort');
   const page = readPositiveIntParam(searchParams, 'page', QUERY_DEFAULTS.page);
   const limit = readPositiveIntParam(
     searchParams,
@@ -39,19 +43,29 @@ export function useProjectsWorkspace() {
     ALLOWED_LIMITS,
   );
 
+  const departments = useActiveDepartments();
+  const clients = useActiveClients();
+  const employees = useActiveEmployees();
+
   const query = useQuery({
     queryKey: queryKeys.projects.list({
       q: search,
-      category: categoryFilter,
+      departmentId: departmentFilter,
+      ...(clientFilter ? { clientId: clientFilter } : {}),
+      ownerId: ownerFilter,
       status: statusFilter,
+      ...(sort ? { sort } : {}),
       page,
       limit,
     }),
     queryFn: ({ signal }) =>
       projectsService.list({
         q: search,
-        category: categoryFilter,
+        departmentId: departmentFilter,
+        ...(clientFilter ? { clientId: clientFilter } : {}),
+        ownerId: ownerFilter,
         status: statusFilter,
+        ...(sort ? { sort } : {}),
         page,
         limit,
         signal,
@@ -68,32 +82,6 @@ export function useProjectsWorkspace() {
     totalPages: 1,
   };
 
-  const quickCompleteMutation = useMutation({
-    mutationFn: (project: ProjectItem) => {
-      const nextDone = project.tasksCompleted + 1;
-      const nextStatus: ProjectStatus =
-        nextDone >= project.tasksTotal ? 'completed' : 'in_progress';
-      return projectsService.update(project.id, {
-        tasksCompleted: nextDone,
-        status: nextStatus,
-      });
-    },
-    onMutate: () => setActionError(null),
-    onSuccess: (updated) => {
-      void invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'audit']);
-      toast.success(
-        updated.status === 'completed'
-          ? `"${updated.name}" marked completed.`
-          : `Logged +1 task for "${updated.name}".`,
-      );
-    },
-    onError: (err: unknown) => {
-      const message = getErrorMessage(err, 'Failed to update task count.');
-      setActionError(message);
-      toast.error(message);
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (project: ProjectItem) => projectsService.remove(project.id),
     onMutate: () => setActionError(null),
@@ -101,7 +89,14 @@ export function useProjectsWorkspace() {
       if (projects.length <= 1 && page > 1) {
         updateParams({ page: page - 1 });
       }
-      void invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'users', 'audit']);
+      void invalidateWorkspaceQueries(queryClient, [
+        'projects',
+        'dashboard',
+        'departments',
+        'clients',
+        'users',
+        'audit',
+      ]);
       toast.success(`Deleted "${project.name}".`);
     },
     onError: (err: unknown) => {
@@ -111,47 +106,13 @@ export function useProjectsWorkspace() {
     },
   });
 
-  const busyId = quickCompleteMutation.isPending
-    ? quickCompleteMutation.variables.id
-    : deleteMutation.isPending
-      ? deleteMutation.variables.id
-      : null;
-
-  function setSearch(value: string) {
-    updateParams({ q: value, page: 1 });
-  }
-
-  function setStatusFilter(value: string) {
-    updateParams({ status: value, page: 1 });
-  }
-
-  function setCategoryFilter(value: string) {
-    updateParams({ category: value, page: 1 });
-  }
-
-  function setPage(nextPage: number) {
-    updateParams({ page: nextPage });
-  }
-
-  function setLimit(value: number) {
-    updateParams({ limit: value, page: 1 });
-  }
-
-  async function handleQuickCompleteTask(project: ProjectItem) {
-    if (project.tasksCompleted >= project.tasksTotal) return;
-    await quickCompleteMutation.mutateAsync(project).catch(() => undefined);
-  }
-
-  async function handleDelete(project: ProjectItem) {
-    await deleteMutation.mutateAsync(project).catch(() => undefined);
-  }
-
-  async function reloadProjects() {
-    await invalidateWorkspaceQueries(queryClient, ['projects', 'dashboard', 'users', 'audit']);
-  }
+  const busyId = deleteMutation.isPending ? deleteMutation.variables.id : null;
 
   return {
     projects,
+    departments,
+    clients,
+    employees,
     stats,
     pagination,
     loaded: !query.isPending,
@@ -160,16 +121,29 @@ export function useProjectsWorkspace() {
       actionError ??
       (query.error ? getErrorMessage(query.error, 'Unable to load projects.') : null),
     search,
-    setSearch,
+    setSearch: (value: string) => updateParams({ q: value, page: 1 }),
     statusFilter,
-    setStatusFilter,
-    categoryFilter,
-    setCategoryFilter,
-    setPage,
-    setLimit,
+    setStatusFilter: (value: string) => updateParams({ status: value, page: 1 }),
+    departmentFilter,
+    setDepartmentFilter: (value: string) => updateParams({ departmentId: value, page: 1 }),
+    clientFilter,
+    setClientFilter: (value: string) => updateParams({ clientId: value, page: 1 }),
+    ownerFilter,
+    setOwnerFilter: (value: string) => updateParams({ ownerId: value, page: 1 }),
+    sort,
+    setSort: (value: string) => updateParams({ sort: value === 'recent' ? '' : value, page: 1 }),
+    setPage: (nextPage: number) => updateParams({ page: nextPage }),
+    setLimit: (value: number) => updateParams({ limit: value, page: 1 }),
     busyId,
-    reloadProjects,
-    handleQuickCompleteTask,
-    handleDelete,
+    reloadProjects: () =>
+      invalidateWorkspaceQueries(queryClient, [
+        'projects',
+        'dashboard',
+        'departments',
+        'clients',
+        'users',
+        'audit',
+      ]),
+    handleDelete: (project: ProjectItem) => deleteMutation.mutateAsync(project).catch(() => undefined),
   };
 }

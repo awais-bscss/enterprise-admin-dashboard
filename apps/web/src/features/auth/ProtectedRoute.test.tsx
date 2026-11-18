@@ -14,10 +14,10 @@ function TestRoutes() {
       <Route path="/login" element={<div>Sign In Screen</div>} />
       <Route path="/unauthorized" element={<div>Access Restricted Screen</div>} />
       <Route
-        path="/settings"
+        path="/reports"
         element={
-          <ProtectedRoute permission="settings:manage">
-            <div>System Settings Console</div>
+          <ProtectedRoute permission="reports:export">
+            <div>Reports Export Console</div>
           </ProtectedRoute>
         }
       />
@@ -40,7 +40,7 @@ function TestRoutes() {
 
 describe('ProtectedRoute and PermissionGate', () => {
   it('redirects unauthenticated users to /login when no session cookie exists', async () => {
-    renderWithProviders(<TestRoutes />, { initialEntries: ['/settings'] });
+    renderWithProviders(<TestRoutes />, { initialEntries: ['/reports'] });
 
     expect(await screen.findByText('Sign In Screen')).toBeInTheDocument();
   });
@@ -56,7 +56,7 @@ describe('ProtectedRoute and PermissionGate', () => {
       ),
     );
 
-    renderWithProviders(<TestRoutes />, { initialEntries: ['/settings'] });
+    renderWithProviders(<TestRoutes />, { initialEntries: ['/reports'] });
     expect(await screen.findByText('Access Restricted Screen')).toBeInTheDocument();
   });
 

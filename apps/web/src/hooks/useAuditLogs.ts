@@ -21,6 +21,7 @@ export function useAuditLogs() {
   const { searchParams, updateParams } = useUrlQueryUpdater(QUERY_DEFAULTS);
   const [exportingCsv, setExportingCsv] = useState(false);
 
+  const search = readStringParam(searchParams, 'q');
   const resourceFilter = readStringParam(searchParams, 'resourceType');
   const page = readPositiveIntParam(searchParams, 'page', QUERY_DEFAULTS.page);
   const limit = readPositiveIntParam(
@@ -31,9 +32,10 @@ export function useAuditLogs() {
   );
 
   const query = useQuery({
-    queryKey: queryKeys.audit.list({ resourceType: resourceFilter, page, limit }),
+    queryKey: queryKeys.audit.list({ q: search, resourceType: resourceFilter, page, limit }),
     queryFn: ({ signal }) =>
       workspaceService.listAuditLogs({
+        q: search,
         resourceType: resourceFilter,
         page,
         limit,
@@ -49,6 +51,10 @@ export function useAuditLogs() {
     total: 0,
     totalPages: 1,
   };
+
+  function setSearch(value: string) {
+    updateParams({ q: value, page: 1 });
+  }
 
   function setResourceFilter(value: string) {
     updateParams({ resourceType: value, page: 1 });
@@ -97,6 +103,8 @@ export function useAuditLogs() {
   return {
     logs,
     pagination,
+    search,
+    setSearch,
     resourceFilter,
     setResourceFilter,
     setPage,

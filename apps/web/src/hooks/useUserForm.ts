@@ -6,6 +6,7 @@ import { invalidateWorkspaceQueries } from '../lib/queryKeys';
 import { validateEmail, validateMinLength, validatePasswordMin } from '../lib/validation';
 import { usersService } from '../services/apiService';
 import type { DirectoryPreviewUser, Role } from '../types/auth';
+import { useActiveDepartments } from './useWorkspaceOptions';
 
 export function useUserForm(
   member: DirectoryPreviewUser | null | undefined,
@@ -22,7 +23,10 @@ export function useUserForm(
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>(member?.role ?? 'viewer');
   const [status, setStatus] = useState<'active' | 'suspended'>(member?.status ?? 'active');
+  const [departmentId, setDepartmentId] = useState(member?.department?.id ?? '');
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const departments = useActiveDepartments(member?.department);
 
   const saveMutation = useMutation({
     mutationFn: ({
@@ -36,6 +40,7 @@ export function useUserForm(
         ? usersService.update(member.id, {
             name: trimmedName,
             email: trimmedEmail,
+            departmentId: departmentId || null,
             ...(isSelf ? {} : { role, status }),
             ...(password ? { password } : {}),
           })
@@ -45,9 +50,16 @@ export function useUserForm(
             password,
             role,
             status,
+            departmentId: departmentId || null,
           }),
     onSuccess: (saved) => {
-      void invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'projects', 'audit']);
+      void invalidateWorkspaceQueries(queryClient, [
+        'users',
+        'dashboard',
+        'departments',
+        'projects',
+        'audit',
+      ]);
       toast.success(
         isEditing ? `Updated member "${saved.name}".` : `Created user "${saved.name}".`,
       );
@@ -94,6 +106,9 @@ export function useUserForm(
     setRole,
     status,
     setStatus,
+    departmentId,
+    setDepartmentId,
+    departments,
     submitting: saveMutation.isPending,
     error:
       validationError ??

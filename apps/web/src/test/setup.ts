@@ -9,10 +9,11 @@ import { server } from './mswServer';
 vi.mock('../app/routePreload', () => ({
   loadDashboardPage: vi.fn(),
   loadProjectsPage: vi.fn(),
+  loadDepartmentsPage: vi.fn(),
+  loadClientsPage: vi.fn(),
   loadDirectoryPage: vi.fn(),
   loadAuditLogsPage: vi.fn(),
   loadReportsPage: vi.fn(),
-  loadSettingsPage: vi.fn(),
   preloadRoute: vi.fn(),
 }));
 

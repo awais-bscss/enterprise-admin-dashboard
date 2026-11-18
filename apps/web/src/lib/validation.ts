@@ -1,9 +1,12 @@
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function validateEmail(email: string): string | null {
+export function validateEmail(
+  email: string,
+  message = 'Please enter a valid work email address.',
+): string | null {
   const normalized = email.trim();
   if (!normalized || !EMAIL_PATTERN.test(normalized)) {
-    return 'Please enter a valid work email address.';
+    return message;
   }
   return null;
 }

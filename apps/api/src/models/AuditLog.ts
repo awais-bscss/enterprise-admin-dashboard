@@ -1,6 +1,13 @@
 import mongoose, { type InferSchemaType } from "mongoose";
 
-export const AUDIT_RESOURCES = ["auth", "project", "user", "settings", "report"] as const;
+export const AUDIT_RESOURCES = [
+  "auth",
+  "project",
+  "department",
+  "client",
+  "user",
+  "report",
+] as const;
 export type AuditResource = (typeof AUDIT_RESOURCES)[number];
 
 const auditLogSchema = new mongoose.Schema(

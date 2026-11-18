@@ -10,19 +10,21 @@ import { UnauthorizedPage } from '../features/auth/UnauthorizedPage';
 import { queryClient } from '../lib/queryClient';
 import {
   loadAuditLogsPage,
+  loadClientsPage,
   loadDashboardPage,
+  loadDepartmentsPage,
   loadDirectoryPage,
   loadProjectsPage,
   loadReportsPage,
-  loadSettingsPage,
 } from './routePreload';
 
 const DashboardPage = lazy(loadDashboardPage);
 const ProjectsPage = lazy(loadProjectsPage);
+const DepartmentsPage = lazy(loadDepartmentsPage);
+const ClientsPage = lazy(loadClientsPage);
 const DirectoryPage = lazy(loadDirectoryPage);
 const AuditLogsPage = lazy(loadAuditLogsPage);
 const ReportsPage = lazy(loadReportsPage);
-const SettingsPage = lazy(loadSettingsPage);
 
 export function App() {
   return (
@@ -51,14 +53,31 @@ export function App() {
                   }
                 />
                 <Route
-                  path="/users"
+                  path="/departments"
+                  element={
+                    <ProtectedRoute permission="departments:read">
+                      <DepartmentsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/clients"
+                  element={
+                    <ProtectedRoute permission="clients:read">
+                      <ClientsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/employees"
                   element={
                     <ProtectedRoute permission="users:read">
                       <DirectoryPage />
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/directory" element={<Navigate to="/users" replace />} />
+                <Route path="/users" element={<Navigate to="/employees" replace />} />
+                <Route path="/directory" element={<Navigate to="/employees" replace />} />
                 <Route
                   path="/audit"
                   element={
@@ -72,14 +91,6 @@ export function App() {
                   element={
                     <ProtectedRoute permission="reports:export">
                       <ReportsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/settings"
-                  element={
-                    <ProtectedRoute permission="settings:manage">
-                      <SettingsPage />
                     </ProtectedRoute>
                   }
                 />

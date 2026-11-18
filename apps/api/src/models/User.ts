@@ -8,6 +8,12 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ROLES, default: "viewer", required: true },
     status: { type: String, enum: ["active", "suspended"], default: "active", required: true },
+    departmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
+      default: null,
+      index: true,
+    },
   },
   { timestamps: true },
 );

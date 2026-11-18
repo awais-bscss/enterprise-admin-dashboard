@@ -3,14 +3,15 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useToast } from '../components/toast/toastContext';
 import { getErrorMessage } from '../lib/errors';
 import { invalidateWorkspaceQueries, queryKeys } from '../lib/queryKeys';
+import { usersService } from '../services/apiService';
+import type { PaginationMeta } from '../types/api';
+import type { DirectoryPreviewUser, Role, UsersDirectoryStats } from '../types/auth';
 import {
   readPositiveIntParam,
   readStringParam,
   useUrlQueryUpdater,
 } from './useUrlQueryState';
-import { usersService } from '../services/apiService';
-import type { PaginationMeta } from '../types/api';
-import type { DirectoryPreviewUser, Role, UsersDirectoryStats } from '../types/auth';
+import { useActiveDepartments } from './useWorkspaceOptions';
 
 const EMPTY_STATS: UsersDirectoryStats = {
   total: 0,
@@ -33,6 +34,7 @@ export function useUsersDirectory() {
   const search = readStringParam(searchParams, 'q');
   const roleFilter = readStringParam(searchParams, 'role');
   const statusFilter = readStringParam(searchParams, 'status');
+  const departmentFilter = readStringParam(searchParams, 'departmentId');
   const page = readPositiveIntParam(searchParams, 'page', QUERY_DEFAULTS.page);
   const limit = readPositiveIntParam(
     searchParams,
@@ -41,11 +43,14 @@ export function useUsersDirectory() {
     ALLOWED_LIMITS,
   );
 
+  const departments = useActiveDepartments();
+
   const query = useQuery({
     queryKey: queryKeys.users.list({
       q: search,
       role: roleFilter,
       status: statusFilter,
+      departmentId: departmentFilter,
       page,
       limit,
     }),
@@ -54,6 +59,7 @@ export function useUsersDirectory() {
         q: search,
         role: roleFilter,
         status: statusFilter,
+        departmentId: departmentFilter,
         page,
         limit,
         signal,
@@ -113,7 +119,13 @@ export function useUsersDirectory() {
       if (users.length <= 1 && page > 1) {
         updateParams({ page: page - 1 });
       }
-      void invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'projects', 'audit']);
+      void invalidateWorkspaceQueries(queryClient, [
+        'users',
+        'dashboard',
+        'departments',
+        'projects',
+        'audit',
+      ]);
       toast.success(`Removed user "${member.name}".`);
     },
     onError: (err: unknown) => {
@@ -131,63 +143,40 @@ export function useUsersDirectory() {
         ? deleteMutation.variables.id
         : null;
 
-  function setSearch(value: string) {
-    updateParams({ q: value, page: 1 });
-  }
-
-  function setRoleFilter(value: string) {
-    updateParams({ role: value, page: 1 });
-  }
-
-  function setStatusFilter(value: string) {
-    updateParams({ status: value, page: 1 });
-  }
-
-  function setPage(nextPage: number) {
-    updateParams({ page: nextPage });
-  }
-
-  function setLimit(value: number) {
-    updateParams({ limit: value, page: 1 });
-  }
-
-  async function handleRoleChange(member: DirectoryPreviewUser, role: Role) {
-    await roleMutation.mutateAsync({ member, role }).catch(() => undefined);
-  }
-
-  async function handleStatusToggle(member: DirectoryPreviewUser) {
-    await statusMutation.mutateAsync(member).catch(() => undefined);
-  }
-
-  async function handleDeleteUser(member: DirectoryPreviewUser) {
-    await deleteMutation.mutateAsync(member).catch(() => undefined);
-  }
-
-  async function reloadDirectory() {
-    await invalidateWorkspaceQueries(queryClient, ['users', 'dashboard', 'projects', 'audit']);
-  }
-
   return {
     users,
+    departments,
     stats,
     pagination,
     search,
-    setSearch,
+    setSearch: (value: string) => updateParams({ q: value, page: 1 }),
     roleFilter,
-    setRoleFilter,
+    setRoleFilter: (value: string) => updateParams({ role: value, page: 1 }),
     statusFilter,
-    setStatusFilter,
-    setPage,
-    setLimit,
+    setStatusFilter: (value: string) => updateParams({ status: value, page: 1 }),
+    departmentFilter,
+    setDepartmentFilter: (value: string) => updateParams({ departmentId: value, page: 1 }),
+    setPage: (nextPage: number) => updateParams({ page: nextPage }),
+    setLimit: (value: number) => updateParams({ limit: value, page: 1 }),
     loaded: !query.isPending,
     isFetching: query.isFetching,
     error:
       actionError ??
       (query.error ? getErrorMessage(query.error, 'Unable to load directory.') : null),
     busyId,
-    reloadDirectory,
-    handleRoleChange,
-    handleStatusToggle,
-    handleDeleteUser,
+    reloadDirectory: () =>
+      invalidateWorkspaceQueries(queryClient, [
+        'users',
+        'dashboard',
+        'departments',
+        'projects',
+        'audit',
+      ]),
+    handleRoleChange: (member: DirectoryPreviewUser, role: Role) =>
+      roleMutation.mutateAsync({ member, role }).catch(() => undefined),
+    handleStatusToggle: (member: DirectoryPreviewUser) =>
+      statusMutation.mutateAsync(member).catch(() => undefined),
+    handleDeleteUser: (member: DirectoryPreviewUser) =>
+      deleteMutation.mutateAsync(member).catch(() => undefined),
   };
 }

@@ -14,6 +14,7 @@ interface StatBentoCardProps {
   tone: BentoTone;
   icon: LucideIcon;
   rightSlot?: ReactNode;
+  loading?: boolean;
 }
 
 export function StatBentoCard({
@@ -25,11 +26,17 @@ export function StatBentoCard({
   tone,
   icon: Icon,
   rightSlot,
+  loading = false,
 }: StatBentoCardProps) {
   const styles = BENTO_TONE_TOKENS[tone];
 
   return (
-    <article className={`${SURFACE_TOKENS.cardInteractive} flex flex-col justify-between p-5`}>
+    <article
+      className={`${SURFACE_TOKENS.cardInteractive} flex flex-col justify-between p-5 ${
+        loading ? 'animate-pulse' : ''
+      }`}
+      aria-busy={loading ? 'true' : undefined}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
@@ -49,23 +56,41 @@ export function StatBentoCard({
         </Link>
       </div>
 
-      <div className="my-5 flex items-baseline gap-2.5">
-        <p className="tabular-nums text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          {value}
-        </p>
-        {delta ? (
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${styles.badgeBg} ${styles.badgeText}`}
-          >
-            {delta}
-          </span>
-        ) : null}
-      </div>
+      {loading ? (
+        <>
+          <div className="my-5 flex items-center gap-2.5">
+            <div className="h-9 w-14 rounded-lg bg-slate-200/80 dark:bg-slate-700/70" />
+            <div className="h-5 w-16 rounded-full bg-slate-200/80 dark:bg-slate-700/70" />
+          </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3.5 dark:border-slate-800">
-        <span className="text-xs font-medium text-slate-400">{footerLabel}</span>
-        {rightSlot}
-      </div>
+          <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3.5 dark:border-slate-800">
+            <div className="h-3.5 w-24 rounded bg-slate-200/80 dark:bg-slate-700/70" />
+            <div className="h-5 w-16 rounded-full bg-slate-200/80 dark:bg-slate-700/70" />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="my-5 flex items-baseline gap-2.5">
+            <p className="tabular-nums text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              {value}
+            </p>
+            {delta ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${styles.badgeBg} ${styles.badgeText}`}
+              >
+                {delta}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3.5 dark:border-slate-800">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              {footerLabel}
+            </span>
+            {rightSlot}
+          </div>
+        </>
+      )}
     </article>
   );
 }

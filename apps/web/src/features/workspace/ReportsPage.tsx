@@ -28,7 +28,7 @@ export function ReportsPage() {
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                 Compliance Reports
               </h1>
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
                 Export live project progress and directory governance snapshots.
               </p>
             </div>
@@ -88,7 +88,7 @@ export function ReportsPage() {
               </article>
               <article className={`${SURFACE_TOKENS.panel} p-5`}>
                 <p className="text-xs font-medium text-slate-500 uppercase dark:text-slate-400">
-                  Directory Users
+                  Total Employees
                 </p>
                 <p className="tabular-nums mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">
                   {overview ? overview.stats.totalUsers : '--'}

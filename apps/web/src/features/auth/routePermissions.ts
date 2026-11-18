@@ -3,11 +3,13 @@ import type { AuthUser, Permission } from '../../types/auth';
 export const ROUTE_PERMISSIONS: Record<string, Permission | undefined> = {
   '/dashboard': undefined,
   '/projects': 'projects:read',
+  '/departments': 'departments:read',
+  '/clients': 'clients:read',
+  '/employees': 'users:read',
   '/users': 'users:read',
   '/directory': 'users:read',
   '/audit': 'audit:read',
   '/reports': 'reports:export',
-  '/settings': 'settings:manage',
 };
 
 export function canUserAccessPath(user: AuthUser | null, pathname: string): boolean {

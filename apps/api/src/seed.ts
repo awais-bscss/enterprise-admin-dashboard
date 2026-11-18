@@ -4,15 +4,17 @@ import { z } from "zod";
 import { env } from "./config/env.js";
 import { type Role } from "./config/rbac.js";
 import { AuditLog } from "./models/AuditLog.js";
+import { Client } from "./models/Client.js";
+import { Department } from "./models/Department.js";
 import { Project } from "./models/Project.js";
 import { User } from "./models/User.js";
-import { WorkspaceSetting } from "./models/WorkspaceSetting.js";
 
 interface SeedAccount {
   name: string;
   email: string;
   password: string;
   role: Role;
+  departmentCode: string;
 }
 
 const optionalSeedString = z
@@ -93,6 +95,7 @@ function resolveSeedAccounts(): SeedAccount[] {
       email: data.SEED_ADMIN_EMAIL.toLowerCase(),
       password: data.SEED_ADMIN_PASSWORD,
       role: "admin",
+      departmentCode: "SEC",
     },
   ];
 
@@ -102,6 +105,7 @@ function resolveSeedAccounts(): SeedAccount[] {
       email: data.SEED_MANAGER_EMAIL.toLowerCase(),
       password: data.SEED_MANAGER_PASSWORD,
       role: "manager",
+      departmentCode: "DEVOPS",
     });
   }
 
@@ -111,18 +115,120 @@ function resolveSeedAccounts(): SeedAccount[] {
       email: data.SEED_VIEWER_EMAIL.toLowerCase(),
       password: data.SEED_VIEWER_PASSWORD,
       role: "viewer",
+      departmentCode: "FE",
     });
   }
 
   return accounts;
 }
 
+const DEFAULT_DEPARTMENTS = [
+  {
+    name: "Frontend",
+    code: "FE",
+    headName: "Zainab Ali",
+    description: "Client interfaces, component architecture, and web performance.",
+    status: "active",
+  },
+  {
+    name: "Backend",
+    code: "BE",
+    headName: "Hamza Raza",
+    description: "REST APIs, data modeling, and distributed server reliability.",
+    status: "active",
+  },
+  {
+    name: "DevOps",
+    code: "DEVOPS",
+    headName: "Bilal Ahmed",
+    description: "Cloud infrastructure, CI/CD automation, and deployment operations.",
+    status: "active",
+  },
+  {
+    name: "Security",
+    code: "SEC",
+    headName: "Omar Tariq",
+    description: "Application security, RBAC governance, and compliance controls.",
+    status: "active",
+  },
+  {
+    name: "SEO",
+    code: "SEO",
+    headName: "Hira Siddiqui",
+    description: "Technical search optimization, crawl health, and organic growth.",
+    status: "active",
+  },
+  {
+    name: "UI/UX",
+    code: "UIUX",
+    headName: "Sara Khan",
+    description: "Design systems, user research, prototyping, and accessibility.",
+    status: "active",
+  },
+  {
+    name: "AI",
+    code: "AI",
+    headName: "Usman Farooq",
+    description: "Machine learning pipelines, automation models, and data intelligence.",
+    status: "active",
+  },
+  {
+    name: "HR",
+    code: "HR",
+    headName: "Ayesha Malik",
+    description: "Talent acquisition, employee onboarding, and people operations.",
+    status: "active",
+  },
+] as const;
+
 async function seed(): Promise<void> {
   const accounts = resolveSeedAccounts();
   await mongoose.connect(env.MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
 
-  const seededUsers = new Map<Role, mongoose.Types.ObjectId>();
+  await Department.bulkWrite(
+    DEFAULT_DEPARTMENTS.map((dept) => ({
+      updateOne: {
+        filter: { code: dept.code },
+        update: { $setOnInsert: dept },
+        upsert: true,
+      },
+    })),
+  );
 
+  const departments = await Department.find().select("_id code").lean();
+  const deptByCode = new Map(departments.map((d) => [d.code, d._id]));
+
+  const existingClients = await Client.countDocuments();
+  if (existingClients === 0) {
+    await Client.insertMany([
+      {
+        name: "Elena Rostova",
+        company: "Northstar Logistics",
+        email: "elena@northstar-logistics.example",
+        phone: "+1-555-0142",
+        status: "active",
+      },
+      {
+        name: "Daniel Chen",
+        company: "Apex FinTech Group",
+        email: "dchen@apexfintech.example",
+        phone: "+1-555-0198",
+        status: "active",
+      },
+      {
+        name: "Nadia Malik",
+        company: "Crescent Health Systems",
+        email: "nmalik@crescenthealth.example",
+        phone: "+1-555-0175",
+        status: "inactive",
+      },
+    ]);
+  }
+  const clients = await Client.find().select("_id").sort({ createdAt: 1 }).lean();
+  const primaryClientId = clients[0]?._id ?? null;
+  const secondaryClientId = clients[1]?._id ?? primaryClientId;
+
+  const seededUsers = new Map<Role, mongoose.Types.ObjectId>();
   for (const account of accounts) {
     const passwordHash = await bcrypt.hash(account.password, 10);
     const userDoc = await User.findOneAndUpdate(
@@ -133,6 +239,7 @@ async function seed(): Promise<void> {
         passwordHash,
         role: account.role,
         status: "active",
+        departmentId: deptByCode.get(account.departmentCode) ?? null,
       },
       { upsert: true, returnDocument: "after" },
     );
@@ -143,24 +250,16 @@ async function seed(): Promise<void> {
   const adminId = seededUsers.get("admin")!;
   const managerId = seededUsers.get("manager") ?? adminId;
 
-  await WorkspaceSetting.findOneAndUpdate(
-    { key: "default" },
-    { $setOnInsert: { key: "default", organizationName: "Veridian Enterprise" } },
-    { upsert: true, returnDocument: "after" },
-  );
-
   const existingProjects = await Project.countDocuments();
   if (existingProjects === 0) {
-
     await Project.insertMany([
       {
         name: "Zero-Trust Identity Gateway",
         description: "Deploy rotating refresh tokens and CSRF verification across workspace services.",
-        category: "security",
+        departmentId: deptByCode.get("SEC") ?? null,
+        clientId: primaryClientId,
         status: "completed",
         priority: "high",
-        tasksTotal: 18,
-        tasksCompleted: 18,
         progress: 100,
         dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         ownerId: adminId,
@@ -168,11 +267,10 @@ async function seed(): Promise<void> {
       {
         name: "Admin Console UI System",
         description: "Build accessible light-bento dashboard primitives and chart telemetry views.",
-        category: "design",
+        departmentId: deptByCode.get("UIUX") ?? null,
+        clientId: secondaryClientId,
         status: "in_progress",
         priority: "medium",
-        tasksTotal: 14,
-        tasksCompleted: 9,
         progress: 64,
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         ownerId: managerId,
@@ -180,35 +278,32 @@ async function seed(): Promise<void> {
       {
         name: "Directory & Role API Sync",
         description: "End-to-end CRUD and Mongoose aggregation layer for user administration.",
-        category: "development",
+        departmentId: deptByCode.get("BE") ?? null,
+        clientId: primaryClientId,
         status: "in_progress",
         priority: "high",
-        tasksTotal: 20,
-        tasksCompleted: 16,
         progress: 80,
         dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
         ownerId: adminId,
       },
       {
-        name: "Automated Auth QA Suite",
-        description: "Integration coverage for RBAC routes, token reuse protection, and form guards.",
-        category: "testing",
+        name: "CI/CD Release Automation",
+        description: "Automated deployment pipelines and edge health monitoring workflows.",
+        departmentId: deptByCode.get("DEVOPS") ?? null,
+        clientId: secondaryClientId,
         status: "in_progress",
         priority: "medium",
-        tasksTotal: 12,
-        tasksCompleted: 9,
         progress: 75,
         dueDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
         ownerId: managerId,
       },
       {
-        name: "Compliance Archive Pipeline",
-        description: "Scheduled export packs and audit retention checks for governance reviews.",
-        category: "development",
+        name: "Client Portal Frontend v2",
+        description: "Responsive client workspace views and performance optimization.",
+        departmentId: deptByCode.get("FE") ?? null,
+        clientId: primaryClientId,
         status: "upcoming",
         priority: "low",
-        tasksTotal: 10,
-        tasksCompleted: 2,
         progress: 20,
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         ownerId: adminId,
@@ -248,16 +343,16 @@ async function seed(): Promise<void> {
         actorName: adminAccount.name,
         actorEmail: adminAccount.email,
         actorRole: "admin",
-        action: "settings.updated",
-        resourceType: "settings",
-        summary: "Configured baseline security policy",
+        action: "department.created",
+        resourceType: "department",
+        summary: 'Created department "Frontend" (FE)',
         createdAt: new Date(now - 1 * dayMs),
         updatedAt: new Date(now - 1 * dayMs),
       },
     ]);
   }
 
-  console.log(`Seeded ${accounts.length} enterprise accounts and baseline projects.`);
+  console.log(`Seeded ${accounts.length} enterprise accounts, projects, departments, and clients.`);
   await mongoose.disconnect();
 }
 

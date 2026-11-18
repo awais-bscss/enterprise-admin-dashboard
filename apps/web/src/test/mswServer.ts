@@ -1,12 +1,16 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import {
+  TEST_ACTIVITY_TREND,
   TEST_ADMIN_USER,
-  TEST_DASHBOARD_OVERVIEW,
+  TEST_DASHBOARD_SUMMARY,
+  TEST_EMPLOYEE_STATUS,
   TEST_PAGINATION,
   TEST_PROJECT_STATS,
   TEST_PROJECTS,
+  TEST_STATUS_BREAKDOWN,
   TEST_TEAM_MEMBERS,
+  TEST_TRACK_PROGRESS,
   createSessionFixture,
 } from './fixtures';
 
@@ -25,11 +29,20 @@ export const defaultHandlers = [
     }),
   ),
   http.post('*/api/auth/logout', () => HttpResponse.json({ ok: true })),
-  http.get('*/api/dashboard/overview', () =>
-    HttpResponse.json({
-      ok: true,
-      data: TEST_DASHBOARD_OVERVIEW,
-    }),
+  http.get('*/api/dashboard/summary', () =>
+    HttpResponse.json({ ok: true, data: TEST_DASHBOARD_SUMMARY }),
+  ),
+  http.get('*/api/dashboard/track-progress', () =>
+    HttpResponse.json({ ok: true, data: TEST_TRACK_PROGRESS }),
+  ),
+  http.get('*/api/dashboard/status-breakdown', () =>
+    HttpResponse.json({ ok: true, data: TEST_STATUS_BREAKDOWN }),
+  ),
+  http.get('*/api/dashboard/employee-status', () =>
+    HttpResponse.json({ ok: true, data: TEST_EMPLOYEE_STATUS }),
+  ),
+  http.get('*/api/dashboard/activity-trend', () =>
+    HttpResponse.json({ ok: true, data: TEST_ACTIVITY_TREND }),
   ),
   http.get('*/api/projects', () =>
     HttpResponse.json({

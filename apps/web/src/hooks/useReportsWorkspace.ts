@@ -14,8 +14,8 @@ export function useReportsWorkspace() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const overviewQuery = useQuery({
-    queryKey: queryKeys.dashboard,
-    queryFn: ({ signal }) => dashboardService.getOverview(signal),
+    queryKey: queryKeys.dashboard.summary,
+    queryFn: ({ signal }) => dashboardService.getSummary(signal),
   });
 
   async function handleExportCsv() {

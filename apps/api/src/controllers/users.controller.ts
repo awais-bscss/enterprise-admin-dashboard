@@ -1,8 +1,8 @@
 import bcrypt from "bcryptjs";
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
-import { z } from "zod";
-import { ROLES, type Role } from "../config/rbac.js";
+import type { Role } from "../config/rbac.js";
+import { Department } from "../models/Department.js";
 import { Project } from "../models/Project.js";
 import { RefreshToken } from "../models/RefreshToken.js";
 import { User } from "../models/User.js";
@@ -13,84 +13,48 @@ import {
   getWorkspaceSecurityDefaults,
   validateWorkspacePassword,
 } from "../utils/passwordPolicy.js";
-
-const createUserSchema = z.object({
-  name: z.string().trim().min(2, "Name must be at least 2 characters").max(80),
-  email: z.string().trim().email("Please enter a valid email address").toLowerCase(),
-  password: z.string().min(6, "Password must be at least 6 characters").max(128),
-  role: z.enum(ROLES).optional(),
-  status: z.enum(["active", "suspended"]).optional().default("active"),
-});
-
-const updateUserSchema = z.object({
-  name: z.string().trim().min(2, "Name must be at least 2 characters").max(80).optional(),
-  email: z.string().trim().email("Please enter a valid email address").toLowerCase().optional(),
-  role: z.enum(ROLES).optional(),
-  status: z.enum(["active", "suspended"]).optional(),
-  password: z.string().min(6, "Password must be at least 6 characters").max(128).optional(),
-});
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function serializeDirectoryUser(
-  user: {
-    _id: unknown;
-    name: string;
-    email: string;
-    role: string;
-    status: string;
-    createdAt?: Date;
-  },
-  projectCount = 0,
-) {
-  return {
-    id: String(user._id),
-    name: user.name,
-    email: user.email,
-    role: user.role as Role,
-    status: user.status as "active" | "suspended",
-    projectCount,
-    createdAt: user.createdAt ? user.createdAt.toISOString() : undefined,
-  };
-}
+import {
+  buildUserFilter,
+  buildUserListPipeline,
+  createUserSchema,
+  serializeDirectoryUser,
+  summarizeUserDirectoryStats,
+  updateUserSchema,
+  type PopulatedUserDepartment,
+} from "../utils/userHelpers.js";
 
 export async function listUsers(req: Request, res: Response): Promise<void> {
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const role = typeof req.query.role === "string" ? req.query.role.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
+  const departmentId =
+    typeof req.query.departmentId === "string" ? req.query.departmentId.trim() : "";
   const { page, limit } = parsePaginationParams(req.query as Record<string, unknown>, {
     limit: 10,
     maxLimit: 100,
   });
 
-  const filter: Record<string, unknown> = {};
-  if (query) {
-    const regex = new RegExp(escapeRegex(query), "i");
-    filter.$or = [{ name: regex }, { email: regex }];
-  }
-  if (ROLES.includes(role as Role)) {
-    filter.role = role;
-  }
-  if (status === "active" || status === "suspended") {
-    filter.status = status;
-  }
+  const filter = buildUserFilter({ q: query, role, status, departmentId });
 
   const [userSummaryAgg, projectAgg, { items: users, pagination }] = await Promise.all([
     User.aggregate<{ _id: { role: Role; status: string }; count: number }>([
       { $group: { _id: { role: "$role", status: "$status" }, count: { $sum: 1 } } },
     ]),
     Project.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
-      { $group: { _id: "$ownerId", count: { $sum: 1 } } },
+      { $project: { teamIds: { $setUnion: [["$ownerId"], { $ifNull: ["$memberIds", []] }] } } },
+      { $unwind: "$teamIds" },
+      { $group: { _id: "$teamIds", count: { $sum: 1 } } },
     ]),
     resolvePaginatedItems(page, limit, User.countDocuments(filter), (skip) =>
-      User.find(filter)
-        .select("name email role status createdAt")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      User.aggregate<{
+        _id: unknown;
+        name: string;
+        email: string;
+        role: string;
+        status: string;
+        departmentId?: PopulatedUserDepartment | null;
+        createdAt?: Date;
+      }>(buildUserListPipeline(filter, skip, limit)),
     ),
   ]);
 
@@ -98,29 +62,11 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
     projectAgg.map((entry) => [String(entry._id), entry.count]),
   );
 
-  const stats = {
-    total: 0,
-    active: 0,
-    suspended: 0,
-    admins: 0,
-    managers: 0,
-    viewers: 0,
-  };
-  for (const entry of userSummaryAgg) {
-    stats.total += entry.count;
-    if (entry._id.status === "active") stats.active += entry.count;
-    else if (entry._id.status === "suspended") stats.suspended += entry.count;
-
-    if (entry._id.role === "admin") stats.admins += entry.count;
-    else if (entry._id.role === "manager") stats.managers += entry.count;
-    else if (entry._id.role === "viewer") stats.viewers += entry.count;
-  }
-
   res.status(200).json({
     ok: true,
     data: {
       users: users.map((u) => serializeDirectoryUser(u, projectCountMap.get(String(u._id)) ?? 0)),
-      stats,
+      stats: summarizeUserDirectoryStats(userSummaryAgg),
       pagination,
     },
   });
@@ -138,11 +84,20 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { name, email, password, status } = parsed.data;
-  const [policy, duplicate] = await Promise.all([
+  const { name, email, password, status, departmentId } = parsed.data;
+  if (departmentId && !mongoose.isValidObjectId(departmentId)) {
+    sendApiError(res, 400, "VALIDATION_ERROR", "Invalid department id");
+    return;
+  }
+
+  const [policy, duplicate, departmentDoc] = await Promise.all([
     getWorkspaceSecurityDefaults(),
     User.exists({ email }),
+    departmentId
+      ? Department.findById(departmentId).select("_id name code").lean()
+      : Promise.resolve(null),
   ]);
+
   const passwordError = await validateWorkspacePassword(password, policy.enforceStrongPasswords);
   if (passwordError) {
     sendApiError(res, 400, "VALIDATION_ERROR", passwordError);
@@ -153,6 +108,10 @@ export async function createUser(req: Request, res: Response): Promise<void> {
 
   if (duplicate) {
     sendApiError(res, 409, "EMAIL_EXISTS", "A user with this email already exists");
+    return;
+  }
+  if (departmentId && !departmentDoc) {
+    sendApiError(res, 400, "VALIDATION_ERROR", "Selected department is unavailable");
     return;
   }
 
@@ -166,6 +125,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
       passwordHash,
       role: assignedRole,
       status,
+      departmentId: departmentDoc ? departmentDoc._id : null,
     }),
     recordAuditEvent({
       actor: req.auth!,
@@ -178,7 +138,9 @@ export async function createUser(req: Request, res: Response): Promise<void> {
 
   res.status(201).json({
     ok: true,
-    data: { user: serializeDirectoryUser(created, 0) },
+    data: {
+      user: serializeDirectoryUser({ ...created.toObject(), departmentId: departmentDoc }, 0),
+    },
   });
 }
 
@@ -206,9 +168,24 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const user = await User.findById(id).select("name email role status createdAt");
+  if (parsed.data.departmentId && !mongoose.isValidObjectId(parsed.data.departmentId)) {
+    sendApiError(res, 400, "VALIDATION_ERROR", "Invalid department id");
+    return;
+  }
+
+  const [user, departmentDoc] = await Promise.all([
+    User.findById(id).select("name email role status departmentId createdAt"),
+    parsed.data.departmentId
+      ? Department.findById(parsed.data.departmentId).select("_id name code").lean()
+      : Promise.resolve(null),
+  ]);
+
   if (!user) {
     sendApiError(res, 404, "NOT_FOUND", "User not found");
+    return;
+  }
+  if (parsed.data.departmentId && !departmentDoc) {
+    sendApiError(res, 400, "VALIDATION_ERROR", "Selected department is unavailable");
     return;
   }
 
@@ -238,13 +215,18 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     user.status = parsed.data.status;
     if (parsed.data.status === "suspended") revokeTokens = true;
   }
+  if (parsed.data.departmentId !== undefined) {
+    user.departmentId = parsed.data.departmentId
+      ? new mongoose.Types.ObjectId(parsed.data.departmentId)
+      : null;
+  }
 
-  const [, , projectCount] = await Promise.all([
+  const [saved, , projectCount] = await Promise.all([
     user.save(),
     revokeTokens
       ? RefreshToken.updateMany({ userId: user._id, revokedAt: null }, { revokedAt: new Date() })
       : Promise.resolve(),
-    Project.countDocuments({ ownerId: user._id }),
+    Project.countDocuments({ $or: [{ ownerId: user._id }, { memberIds: user._id }] }),
     recordAuditEvent({
       actor: req.auth!,
       action: "user.updated",
@@ -254,9 +236,16 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     }),
   ]);
 
+  await saved.populate("departmentId", "name code");
+
   res.status(200).json({
     ok: true,
-    data: { user: serializeDirectoryUser(user, projectCount) },
+    data: {
+      user: serializeDirectoryUser(
+        saved.toObject() as unknown as Parameters<typeof serializeDirectoryUser>[0],
+        projectCount,
+      ),
+    },
   });
 }
 
@@ -278,9 +267,9 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // Reassign any projects owned by the removed account and log the deletion in parallel.
   await Promise.all([
     Project.updateMany({ ownerId: existing._id }, { ownerId: req.auth!.userId }),
+    Project.updateMany({ memberIds: existing._id }, { $pull: { memberIds: existing._id } }),
     RefreshToken.deleteMany({ userId: existing._id }),
     User.deleteOne({ _id: existing._id }),
     recordAuditEvent({

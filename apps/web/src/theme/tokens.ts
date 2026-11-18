@@ -1,4 +1,4 @@
-import type { AuditLogItem, ProjectCategory, ProjectStatus, Role } from '../types/auth';
+import type { AuditLogItem, DeadlineUrgency, ProjectStatus, Role } from '../types/auth';
 
 export const SURFACE_TOKENS = {
   canvas: 'bg-canvas text-slate-900 dark:text-slate-100',
@@ -44,6 +44,10 @@ export const BADGE_TOKENS = {
     active: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
     suspended: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
   } satisfies Record<'active' | 'suspended', string>,
+  entityStatus: {
+    active: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    inactive: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  } satisfies Record<'active' | 'inactive', string>,
   projectStatus: {
     completed: {
       label: 'Completed',
@@ -61,19 +65,31 @@ export const BADGE_TOKENS = {
         'bg-sky-50 text-sky-700 ring-1 ring-sky-200/70 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/30',
     },
   } satisfies Record<ProjectStatus, { label: string; className: string }>,
-  projectCategory: {
-    development: 'bg-rose-50/90 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
-    design: 'bg-sky-50/90 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
-    testing: 'bg-emerald-50/90 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-    security: 'bg-violet-50/90 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
-  } satisfies Record<ProjectCategory, string>,
   auditResource: {
     auth: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
     project: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    department: 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+    client: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300',
     user: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
-    settings: 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
     report: 'bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
   } satisfies Record<AuditLogItem['resourceType'], string>,
+  deadlineUrgency: {
+    critical: {
+      card: 'border-rose-200/80 bg-rose-50/70 hover:border-rose-300 dark:border-rose-500/30 dark:bg-rose-950/25 dark:hover:border-rose-500/50',
+      badge: 'bg-rose-100 text-rose-700 ring-1 ring-rose-200/80 dark:bg-rose-500/20 dark:text-rose-200 dark:ring-rose-500/30',
+      icon: 'text-rose-600 dark:text-rose-400',
+    },
+    warning: {
+      card: 'border-amber-200/80 bg-amber-50/70 hover:border-amber-300 dark:border-amber-500/30 dark:bg-amber-950/25 dark:hover:border-amber-500/50',
+      badge: 'bg-amber-100 text-amber-800 ring-1 ring-amber-200/80 dark:bg-amber-500/20 dark:text-amber-200 dark:ring-amber-500/30',
+      icon: 'text-amber-600 dark:text-amber-400',
+    },
+    upcoming: {
+      card: 'border-sky-200/80 bg-sky-50/60 hover:border-sky-300 dark:border-sky-500/30 dark:bg-sky-950/20 dark:hover:border-sky-500/50',
+      badge: 'bg-sky-100 text-sky-700 ring-1 ring-sky-200/80 dark:bg-sky-500/20 dark:text-sky-200 dark:ring-sky-500/30',
+      icon: 'text-sky-600 dark:text-sky-400',
+    },
+  } satisfies Record<DeadlineUrgency, { card: string; badge: string; icon: string }>,
   avatarTones: [
     'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
     'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200',
@@ -82,7 +98,7 @@ export const BADGE_TOKENS = {
   ] as const,
 } as const;
 
-export type BentoTone = 'mint' | 'sky' | 'rose';
+export type BentoTone = 'mint' | 'sky' | 'violet' | 'rose';
 
 export const BENTO_TONE_TOKENS: Record<
   BentoTone,
@@ -102,6 +118,13 @@ export const BENTO_TONE_TOKENS: Record<
     badgeBg: 'bg-sky-50 dark:bg-sky-500/15',
     badgeText: 'text-sky-700 dark:text-sky-300',
   },
+  violet: {
+    ring: 'ring-violet-100 dark:ring-violet-500/20',
+    iconBg: 'bg-violet-100/80 dark:bg-violet-500/15',
+    iconText: 'text-violet-700 dark:text-violet-300',
+    badgeBg: 'bg-violet-50 dark:bg-violet-500/15',
+    badgeText: 'text-violet-700 dark:text-violet-300',
+  },
   rose: {
     ring: 'ring-rose-100 dark:ring-rose-500/20',
     iconBg: 'bg-rose-100/80 dark:bg-rose-500/15',
@@ -111,82 +134,156 @@ export const BENTO_TONE_TOKENS: Record<
   },
 };
 
+export interface DepartmentChartTone {
+  hatchBase: string;
+  hatchLine: string;
+  border: string;
+  pillClass: string;
+}
+
+export const DEPARTMENT_PASTEL_TONES: readonly DepartmentChartTone[] = [
+  {
+    hatchBase: '#EFF6FF',
+    hatchLine: '#93C5FD',
+    border: '#BFDBFE',
+    pillClass: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+  },
+  {
+    hatchBase: '#FDF2F8',
+    hatchLine: '#F9A8D4',
+    border: '#FBCFE8',
+    pillClass: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+  },
+  {
+    hatchBase: '#ECFDF5',
+    hatchLine: '#6EE7B7',
+    border: '#A7F3D0',
+    pillClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+  },
+  {
+    hatchBase: '#F5F3FF',
+    hatchLine: '#C4B5FD',
+    border: '#DDD6FE',
+    pillClass: 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+  },
+  {
+    hatchBase: '#FFFBEB',
+    hatchLine: '#FCD34D',
+    border: '#FDE68A',
+    pillClass: 'bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+  },
+  {
+    hatchBase: '#ECFEFF',
+    hatchLine: '#67E8F9',
+    border: '#A5F3FC',
+    pillClass: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300',
+  },
+  {
+    hatchBase: '#EEF2FF',
+    hatchLine: '#A5B4FC',
+    border: '#C7D2FE',
+    pillClass: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+  },
+  {
+    hatchBase: '#F0FDFA',
+    hatchLine: '#5EEAD4',
+    border: '#99F6E4',
+    pillClass: 'bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300',
+  },
+];
+
+export const DEPARTMENT_DARK_HATCHES = [
+  { hatchBase: 'rgba(125, 211, 252, 0.16)', hatchLine: '#7DD3FC', border: '#7DD3FC' },
+  { hatchBase: 'rgba(249, 168, 212, 0.16)', hatchLine: '#F9A8D4', border: '#F9A8D4' },
+  { hatchBase: 'rgba(110, 231, 183, 0.16)', hatchLine: '#6EE7B7', border: '#6EE7B7' },
+  { hatchBase: 'rgba(196, 181, 253, 0.16)', hatchLine: '#C4B5FD', border: '#C4B5FD' },
+  { hatchBase: 'rgba(252, 211, 77, 0.16)', hatchLine: '#FCD34D', border: '#FCD34D' },
+  { hatchBase: 'rgba(103, 232, 249, 0.16)', hatchLine: '#67E8F9', border: '#67E8F9' },
+  { hatchBase: 'rgba(165, 180, 252, 0.16)', hatchLine: '#A5B4FC', border: '#A5B4FC' },
+  { hatchBase: 'rgba(94, 234, 212, 0.16)', hatchLine: '#5EEAD4', border: '#5EEAD4' },
+] as const;
+
 export const CHART_SERIES_TOKENS = {
   rose: {
-    hatchBase: '#FCE7F3',
-    hatchLine: '#F472B6',
-    border: '#F9A8D4',
-    stroke: '#EC4899',
-    dot: '#DB2777',
-    fillStop: '#F9A8D4',
-    barClass: 'bg-rose-400 dark:bg-rose-400',
+    hatchBase: '#FDF2F8',
+    hatchLine: '#F9A8D4',
+    border: '#FBCFE8',
+    stroke: '#F472B6',
+    dot: '#F9A8D4',
+    fillStop: '#FBCFE8',
+    barClass: 'bg-rose-300 dark:bg-rose-400/80',
   },
   sky: {
-    hatchBase: '#DBEAFE',
-    hatchLine: '#60A5FA',
-    border: '#93C5FD',
-    stroke: '#3B82F6',
-    dot: '#2563EB',
-    fillStop: '#60A5FA',
-    barClass: 'bg-sky-400 dark:bg-sky-400',
+    hatchBase: '#EFF6FF',
+    hatchLine: '#93C5FD',
+    border: '#BFDBFE',
+    stroke: '#60A5FA',
+    dot: '#93C5FD',
+    fillStop: '#BAE6FD',
+    barClass: 'bg-sky-300 dark:bg-sky-400/80',
   },
   mint: {
-    hatchBase: '#D1FAE5',
-    hatchLine: '#34D399',
-    border: '#6EE7B7',
-    fill: '#6EE7B7',
-    barClass: 'bg-emerald-400 dark:bg-emerald-400',
+    hatchBase: '#ECFDF5',
+    hatchLine: '#6EE7B7',
+    border: '#A7F3D0',
+    fill: '#A7F3D0',
+    barClass: 'bg-emerald-300 dark:bg-emerald-400/80',
   },
   violet: {
-    hatchBase: '#EDE9FE',
-    hatchLine: '#8B5CF6',
-    border: '#C4B5FD',
+    hatchBase: '#F5F3FF',
+    hatchLine: '#C4B5FD',
+    border: '#DDD6FE',
   },
 } as const;
 
 export function getChartPalette(isDark: boolean) {
   return {
     axisTick: {
-      fill: isDark ? '#94A3B8' : '#475569',
+      fill: isDark ? '#94A3B8' : '#64748B',
       fontSize: 11,
       fontWeight: 500,
     },
-    labelFill: isDark ? '#CBD5E1' : '#334155',
-    gridStroke: isDark ? 'rgba(51, 65, 85, 0.7)' : '#E2E8F0',
-    tooltipCursor: isDark ? 'rgba(30, 41, 59, 0.55)' : 'rgba(226, 232, 240, 0.55)',
+    labelFill: isDark ? '#CBD5E1' : '#475569',
+    gridStroke: isDark ? 'rgba(51, 65, 85, 0.55)' : '#F1F5F9',
+    tooltipCursor: isDark ? 'rgba(30, 41, 59, 0.45)' : 'rgba(226, 232, 240, 0.45)',
     emptySlice: isDark ? '#1E293B' : '#E2E8F0',
     dotBorder: isDark ? '#111B2E' : '#FFFFFF',
+    departmentTones: DEPARTMENT_PASTEL_TONES.map((tone, idx) =>
+      isDark
+        ? { ...tone, ...DEPARTMENT_DARK_HATCHES[idx % DEPARTMENT_DARK_HATCHES.length]! }
+        : tone,
+    ),
     series: isDark
       ? {
           rose: {
             ...CHART_SERIES_TOKENS.rose,
-            hatchBase: 'rgba(244, 114, 182, 0.24)',
-            hatchLine: '#F472B6',
-            border: '#F472B6',
-            stroke: '#F472B6',
-            dot: '#F9A8D4',
-            fillStop: '#F472B6',
+            hatchBase: 'rgba(249, 168, 212, 0.16)',
+            hatchLine: '#F9A8D4',
+            border: '#F9A8D4',
+            stroke: '#F9A8D4',
+            dot: '#FBCFE8',
+            fillStop: '#F9A8D4',
           },
           sky: {
             ...CHART_SERIES_TOKENS.sky,
-            hatchBase: 'rgba(56, 189, 248, 0.24)',
-            hatchLine: '#38BDF8',
-            border: '#60A5FA',
-            stroke: '#38BDF8',
-            dot: '#7DD3FC',
-            fillStop: '#38BDF8',
+            hatchBase: 'rgba(125, 211, 252, 0.16)',
+            hatchLine: '#7DD3FC',
+            border: '#7DD3FC',
+            stroke: '#7DD3FC',
+            dot: '#BAE6FD',
+            fillStop: '#7DD3FC',
           },
           mint: {
             ...CHART_SERIES_TOKENS.mint,
-            hatchBase: 'rgba(52, 211, 153, 0.24)',
-            hatchLine: '#34D399',
-            border: '#34D399',
-            fill: '#34D399',
+            hatchBase: 'rgba(110, 231, 183, 0.16)',
+            hatchLine: '#6EE7B7',
+            border: '#6EE7B7',
+            fill: '#6EE7B7',
           },
           violet: {
-            hatchBase: 'rgba(167, 139, 250, 0.24)',
-            hatchLine: '#A78BFA',
-            border: '#A78BFA',
+            hatchBase: 'rgba(196, 181, 253, 0.16)',
+            hatchLine: '#C4B5FD',
+            border: '#C4B5FD',
           },
         }
       : CHART_SERIES_TOKENS,

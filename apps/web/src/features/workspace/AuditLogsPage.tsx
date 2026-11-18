@@ -2,6 +2,7 @@ import { Activity, Download, RefreshCw } from 'lucide-react';
 import { ErrorAlertBanner } from '../../components/ErrorAlertBanner';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { PaginationControls } from '../../components/PaginationControls';
+import { SearchInput } from '../../components/SearchInput';
 import { TableRowsSkeleton } from '../../components/WorkspaceSkeletons';
 import { BADGE_TOKENS, BUTTON_TOKENS, SURFACE_TOKENS } from '../../theme/tokens';
 import { useAuditLogs } from '../../hooks/useAuditLogs';
@@ -10,6 +11,8 @@ export function AuditLogsPage() {
   const {
     logs,
     pagination,
+    search,
+    setSearch,
     resourceFilter,
     setResourceFilter,
     setPage,
@@ -34,8 +37,8 @@ export function AuditLogsPage() {
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                 Security Audit Logs
               </h1>
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                Live activity trail across sign-ins, project updates, and account changes.
+              <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+                Live activity trail across sign-ins, workspace updates, and account changes.
               </p>
             </div>
           </div>
@@ -63,29 +66,41 @@ export function AuditLogsPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {[
-            { label: 'All Events', value: '' },
-            { label: 'Auth', value: 'auth' },
-            { label: 'Projects', value: 'project' },
-            { label: 'Users', value: 'user' },
-            { label: 'Reports', value: 'report' },
-            { label: 'Settings', value: 'settings' },
-          ].map((tab) => (
-            <button
-              key={tab.label}
-              type="button"
-              onClick={() => setResourceFilter(tab.value)}
-              className={
-                resourceFilter === tab.value
-                  ? BUTTON_TOKENS.filterActive
-                  : BUTTON_TOKENS.filterIdle
-              }
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <section
+          className={`${SURFACE_TOKENS.panel} flex flex-wrap items-center justify-between gap-3 p-4`}
+        >
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: 'All Events', value: '' },
+              { label: 'Auth', value: 'auth' },
+              { label: 'Projects', value: 'project' },
+              { label: 'Departments', value: 'department' },
+              { label: 'Clients', value: 'client' },
+              { label: 'Employees', value: 'user' },
+              { label: 'Reports', value: 'report' },
+            ].map((tab) => (
+              <button
+                key={tab.label}
+                type="button"
+                onClick={() => setResourceFilter(tab.value)}
+                className={
+                  resourceFilter === tab.value
+                    ? BUTTON_TOKENS.filterActive
+                    : BUTTON_TOKENS.filterIdle
+                }
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search events, actors, or actions..."
+            ariaLabel="Search audit logs"
+          />
+        </section>
 
         {error ? (
           <ErrorAlertBanner
@@ -106,16 +121,20 @@ export function AuditLogsPage() {
                   <th className="px-5 py-3.5">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody
+                className={`divide-y divide-slate-100 transition-opacity dark:divide-slate-800 ${
+                  refreshing && loaded ? 'opacity-60' : ''
+                }`}
+              >
                 {!loaded ? (
-                  <TableRowsSkeleton columns={4} />
+                  <TableRowsSkeleton columns={4} ariaLabel="Loading audit logs" />
                 ) : logs.length === 0 ? (
                   <tr>
                     <td
                       colSpan={4}
                       className="px-5 py-8 text-center text-sm text-slate-500 dark:text-slate-400"
                     >
-                      No audit events recorded yet.
+                      No audit events match this filter.
                     </td>
                   </tr>
                 ) : (

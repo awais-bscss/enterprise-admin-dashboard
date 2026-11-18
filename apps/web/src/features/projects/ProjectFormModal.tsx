@@ -1,21 +1,19 @@
 import { AlertCircle, FolderPlus, X } from 'lucide-react';
-import { AppDropdown, type DropdownOption } from '../../components/AppDropdown';
+import {
+  AppDropdown,
+  AppMultiSelectDropdown,
+  type DropdownOption,
+} from '../../components/AppDropdown';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { useProjectForm } from '../../hooks/useProjectForm';
 import { BUTTON_TOKENS, SURFACE_TOKENS } from '../../theme/tokens';
 import type {
-  ProjectCategory,
+  DirectoryPreviewUser,
   ProjectItem,
   ProjectPriority,
   ProjectStatus,
 } from '../../types/auth';
-import { useModalScrollLock } from '../../hooks/useModalScrollLock';
-import { useProjectForm } from '../../hooks/useProjectForm';
-
-const CATEGORY_OPTIONS: readonly DropdownOption<ProjectCategory>[] = [
-  { value: 'development', label: 'Development' },
-  { value: 'design', label: 'Design' },
-  { value: 'testing', label: 'Testing' },
-  { value: 'security', label: 'Security' },
-];
+import { useAuth } from '../auth/authContext';
 
 const STATUS_OPTIONS: readonly DropdownOption<ProjectStatus>[] = [
   { value: 'upcoming', label: 'Upcoming' },
@@ -37,32 +35,57 @@ interface ProjectFormModalProps {
 
 export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModalProps) {
   useModalScrollLock(true);
+  const { user: currentUser } = useAuth();
   const {
     isEditing,
     name,
     setName,
     description,
     setDescription,
-    category,
-    setCategory,
+    departmentId,
+    setDepartmentId,
+    clientId,
+    setClientId,
     status,
     setStatus,
     priority,
     setPriority,
-    tasksTotal,
-    setTasksTotal,
-    tasksCompleted,
-    setTasksCompleted,
+    progress,
+    setProgress,
     ownerId,
     setOwnerId,
+    memberIds,
+    toggleMember,
+    clearMembers,
     dueDate,
     setDueDate,
+    departments,
+    clients,
     teamMembers,
-    parsedTotal,
     submitting,
     error,
     handleSubmit,
   } = useProjectForm(project, onSaved);
+
+  const effectiveLeadId = ownerId || currentUser?.id || '';
+  const toOption = (member: DirectoryPreviewUser): DropdownOption => ({
+    value: member.id,
+    label: member.name,
+    subtitle: `${member.department?.name ?? 'General'} · ${member.role}`,
+    badge:
+      departmentId && member.department?.id === departmentId
+        ? 'Dept'
+        : currentUser?.id === member.id
+          ? 'You'
+          : undefined,
+  });
+  const leadOptions = teamMembers.map(toOption);
+  const collaboratorMembers = teamMembers.filter((member) => member.id !== effectiveLeadId);
+  const collaboratorOptions = collaboratorMembers.map(toOption);
+  const selectedCollaborators = collaboratorMembers.filter((member) =>
+    memberIds.includes(member.id),
+  );
+  const totalWorkingCount = 1 + selectedCollaborators.length;
 
   return (
     <div
@@ -86,8 +109,8 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
               </h2>
               <p className="text-xs text-slate-400">
                 {isEditing
-                  ? 'Update progress, tasks, and delivery status.'
-                  : 'Add a tracked initiative to the workspace.'}
+                  ? 'Update progress, department, client, and assigned employee.'
+                  : 'Create a project linked to a department, client, and employee.'}
               </p>
             </div>
           </div>
@@ -148,24 +171,55 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label
-                htmlFor="proj-cat"
+                htmlFor="proj-dept"
                 className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300"
               >
-                Track
+                Department
               </label>
-              <AppDropdown<ProjectCategory>
-                id="proj-cat"
+              <AppDropdown
+                id="proj-dept"
                 variant="field"
-                value={category}
-                options={CATEGORY_OPTIONS}
-                onChange={setCategory}
-                ariaLabel="Track"
+                value={departmentId}
+                options={[
+                  { value: '', label: 'Unassigned' },
+                  ...departments.map((dept) => ({
+                    value: dept.id,
+                    label: `${dept.name} (${dept.code})`,
+                  })),
+                ]}
+                onChange={setDepartmentId}
+                ariaLabel="Department"
               />
             </div>
 
+            <div>
+              <label
+                htmlFor="proj-client"
+                className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
+                Client
+              </label>
+              <AppDropdown
+                id="proj-client"
+                variant="field"
+                value={clientId}
+                options={[
+                  { value: '', label: 'Internal / None' },
+                  ...clients.map((client) => ({
+                    value: client.id,
+                    label: `${client.company} (${client.name})`,
+                  })),
+                ]}
+                onChange={setClientId}
+                ariaLabel="Client"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label
                 htmlFor="proj-status"
@@ -201,39 +255,21 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label
-                htmlFor="proj-total"
+                htmlFor="proj-progress"
                 className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
               >
-                Total Tasks
+                Progress (%)
               </label>
               <input
-                id="proj-total"
-                type="number"
-                min={1}
-                max={1000}
-                value={tasksTotal}
-                onChange={(e) => setTasksTotal(e.target.value)}
-                className={`mt-1.5 py-2 ${SURFACE_TOKENS.input}`}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="proj-done"
-                className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
-              >
-                Completed Tasks
-              </label>
-              <input
-                id="proj-done"
+                id="proj-progress"
                 type="number"
                 min={0}
-                max={parsedTotal}
-                value={status === 'completed' ? String(parsedTotal) : tasksCompleted}
-                onChange={(e) => setTasksCompleted(e.target.value)}
+                max={100}
+                value={status === 'completed' ? '100' : progress}
+                onChange={(e) => setProgress(e.target.value)}
                 disabled={status === 'completed'}
                 className={`mt-1.5 py-2 ${SURFACE_TOKENS.input} disabled:opacity-60`}
               />
@@ -256,30 +292,79 @@ export function ProjectFormModal({ project, onClose, onSaved }: ProjectFormModal
             </div>
           </div>
 
-          {teamMembers.length > 0 ? (
-            <div>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 htmlFor="proj-owner"
-                className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300"
+                className="text-xs font-semibold text-slate-700 dark:text-slate-300"
               >
-                Project Owner
+                Project Lead
               </label>
-              <AppDropdown
-                id="proj-owner"
-                variant="field"
-                value={ownerId}
-                options={[
-                  { value: '', label: 'Assign to current user' },
-                  ...teamMembers.map((member) => ({
-                    value: member.id,
-                    label: `${member.name} (${member.role})`,
-                  })),
-                ]}
-                onChange={setOwnerId}
-                ariaLabel="Project Owner"
-              />
+              {departmentId ? (
+                <span className="text-[11px] text-slate-400">
+                  Department leads prioritized first
+                </span>
+              ) : null}
             </div>
-          ) : null}
+            <AppDropdown
+              id="proj-owner"
+              variant="field"
+              searchable
+              searchPlaceholder="Search lead by name or department..."
+              value={effectiveLeadId}
+              options={
+                leadOptions.length > 0
+                  ? leadOptions
+                  : [{ value: '', label: 'Loading active employees...' }]
+              }
+              onChange={setOwnerId}
+              ariaLabel="Project Lead"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <label
+                htmlFor="proj-team"
+                className="text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
+                Working Team
+              </label>
+              <span className="tabular-nums rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                {totalWorkingCount} {totalWorkingCount === 1 ? 'employee' : 'employees'} working
+              </span>
+            </div>
+
+            <AppMultiSelectDropdown
+              id="proj-team"
+              searchable
+              searchPlaceholder="Search employees by name or department..."
+              placeholder="Select additional team members..."
+              emptyMessage="No additional active employees available."
+              values={memberIds}
+              options={collaboratorOptions}
+              onToggle={toggleMember}
+              onClear={clearMembers}
+              ariaLabel="Working Team"
+            />
+
+            {selectedCollaborators.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {selectedCollaborators.map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => toggleMember(member.id)}
+                    aria-label={`Remove ${member.name} from working team`}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-primary-soft px-2.5 py-0.5 text-[11px] font-medium text-primary-ink ring-1 ring-primary-border transition hover:opacity-85"
+                  >
+                    <span>{member.name}</span>
+                    <X className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
           <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button type="button" onClick={onClose} className={BUTTON_TOKENS.secondaryPill}>

@@ -66,7 +66,7 @@ export const AuthActivityTrendCard = memo(function AuthActivityTrendCard({
         </h2>
 
         <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-surface-subtle px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300">
-          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+          <Calendar className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
           <span>Last 5 Days</span>
         </span>
       </div>
@@ -74,11 +74,11 @@ export const AuthActivityTrendCard = memo(function AuthActivityTrendCard({
       <div className="mt-3 rounded-2xl border border-slate-100 bg-surface-subtle p-3 dark:border-slate-800">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70 dark:text-slate-200 dark:ring-slate-700">
-            <span className="h-2 w-2 rounded-full bg-sky-400" />
+            <span className="h-2 w-2 rounded-full bg-sky-300" />
             Sign-ins
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70 dark:text-slate-200 dark:ring-slate-700">
-            <span className="h-2 w-2 rounded-full bg-rose-400" />
+            <span className="h-2 w-2 rounded-full bg-rose-300" />
             Workspace changes
           </span>
         </div>
@@ -88,11 +88,11 @@ export const AuthActivityTrendCard = memo(function AuthActivityTrendCard({
             <AreaChart data={series} margin={{ top: 8, right: 6, left: -24, bottom: 0 }}>
               <defs>
                 <linearGradient id="skyPastelFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={chart.series.sky.fillStop} stopOpacity={0.35} />
+                  <stop offset="5%" stopColor={chart.series.sky.fillStop} stopOpacity={0.25} />
                   <stop offset="95%" stopColor={chart.series.sky.fillStop} stopOpacity={0.02} />
                 </linearGradient>
                 <linearGradient id="rosePastelFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={chart.series.rose.fillStop} stopOpacity={0.32} />
+                  <stop offset="5%" stopColor={chart.series.rose.fillStop} stopOpacity={0.22} />
                   <stop offset="95%" stopColor={chart.series.rose.fillStop} stopOpacity={0.02} />
                 </linearGradient>
               </defs>
@@ -116,6 +116,7 @@ export const AuthActivityTrendCard = memo(function AuthActivityTrendCard({
                 type="monotone"
                 dataKey="signIns"
                 name="Sign-ins"
+                isAnimationActive={false}
                 stroke={chart.series.sky.stroke}
                 strokeWidth={2.2}
                 fill="url(#skyPastelFill)"
@@ -130,6 +131,7 @@ export const AuthActivityTrendCard = memo(function AuthActivityTrendCard({
                 type="monotone"
                 dataKey="mutations"
                 name="Workspace changes"
+                isAnimationActive={false}
                 stroke={chart.series.rose.stroke}
                 strokeWidth={2}
                 fill="url(#rosePastelFill)"
@@ -147,7 +149,9 @@ export const AuthActivityTrendCard = memo(function AuthActivityTrendCard({
 
       <div className="mt-4 grid grid-cols-2 gap-3 pt-1">
         <div>
-          <p className="text-[11px] font-medium text-slate-400">Logged sign-ins</p>
+          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            Logged sign-ins
+          </p>
           <div className="mt-1 flex items-center gap-1.5">
             <span className="tabular-nums text-xl font-bold text-slate-900 dark:text-slate-100">
               {totalSignIns}
@@ -160,7 +164,9 @@ export const AuthActivityTrendCard = memo(function AuthActivityTrendCard({
         </div>
 
         <div>
-          <p className="text-[11px] font-medium text-slate-400">Audit updates</p>
+          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            Audit updates
+          </p>
           <div className="mt-1 flex items-center gap-1.5">
             <span className="tabular-nums text-xl font-bold text-slate-900 dark:text-slate-100">
               {totalMutations}

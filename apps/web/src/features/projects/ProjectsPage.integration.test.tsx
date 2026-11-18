@@ -34,11 +34,11 @@ function renderProjectsRoute(initialEntry = '/projects') {
 }
 
 describe('ProjectsPage integration', () => {
-  it('loads projects, filters by status and track, and paginates via API query params', async () => {
+  it('loads projects, filters by status and department, and paginates via API query params', async () => {
     const user = userEvent.setup();
     document.cookie = 'csrf_token=admin-csrf.sig; path=/';
 
-    const recordedQueries: Array<{ status: string | null; category: string | null; page: string | null }> = [];
+    const recordedQueries: Array<{ status: string | null; departmentId: string | null; page: string | null }> = [];
 
     server.use(
       http.post('*/api/auth/refresh', () =>
@@ -50,13 +50,13 @@ describe('ProjectsPage integration', () => {
       http.get('*/api/projects', ({ request }) => {
         const url = new URL(request.url);
         const status = url.searchParams.get('status');
-        const category = url.searchParams.get('category');
+        const departmentId = url.searchParams.get('departmentId');
         const page = url.searchParams.get('page') ?? '1';
-        recordedQueries.push({ status, category, page });
+        recordedQueries.push({ status, departmentId, page });
 
         const filtered = TEST_PROJECTS.filter((project) => {
           if (status && project.status !== status) return false;
-          if (category && project.category !== category) return false;
+          if (departmentId && project.department?.id !== departmentId) return false;
           return true;
         });
 
@@ -104,18 +104,18 @@ describe('ProjectsPage integration', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('Query Cache Observability')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /filter by track/i }));
+    await user.click(screen.getByRole('button', { name: /filter by department/i }));
     await user.click(screen.getByRole('option', { name: 'Security' }));
     expect(
       await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
     ).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(recordedQueries).toContainEqual({ status: null, category: null, page: '2' });
-      expect(recordedQueries).toContainEqual({ status: 'in_progress', category: null, page: '1' });
+      expect(recordedQueries).toContainEqual({ status: null, departmentId: null, page: '2' });
+      expect(recordedQueries).toContainEqual({ status: 'in_progress', departmentId: null, page: '1' });
       expect(recordedQueries).toContainEqual({
         status: 'in_progress',
-        category: 'security',
+        departmentId: 'dept_sec',
         page: '1',
       });
     });
@@ -148,11 +148,11 @@ describe('ProjectsPage integration', () => {
         const body = (await request.json()) as {
           name: string;
           description: string;
-          category: 'security';
+          departmentId?: string | null;
+          clientId?: string | null;
           status: 'in_progress';
           priority: 'high';
-          tasksTotal: number;
-          tasksCompleted: number;
+          progress: number;
         };
 
         const created = {
@@ -160,12 +160,9 @@ describe('ProjectsPage integration', () => {
           id: 'prj_new_1',
           name: body.name,
           description: body.description,
-          category: body.category,
           status: body.status,
           priority: body.priority,
-          tasksTotal: body.tasksTotal,
-          tasksCompleted: body.tasksCompleted,
-          progress: Math.round((body.tasksCompleted / body.tasksTotal) * 100),
+          progress: body.progress,
         };
         store.unshift(created);
 
@@ -278,13 +275,13 @@ describe('ProjectsPage integration', () => {
       }),
     );
 
-    renderProjectsRoute('/projects?status=in_progress&category=security');
+    renderProjectsRoute('/projects?status=in_progress&departmentId=dept_sec');
 
     expect(await screen.findByLabelText('Loading projects')).toBeInTheDocument();
     expect(
       await screen.findByText('Identity Gateway Migration', undefined, { timeout: 4000 }),
     ).toBeInTheDocument();
     expect(receivedParams).toContain('status=in_progress');
-    expect(receivedParams).toContain('category=security');
+    expect(receivedParams).toContain('departmentId=dept_sec');
   });
 });

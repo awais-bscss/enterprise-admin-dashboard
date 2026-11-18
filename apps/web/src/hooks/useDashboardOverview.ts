@@ -1,102 +1,130 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../components/toast/toastContext';
 import { getErrorMessage } from '../lib/errors';
 import { queryKeys } from '../lib/queryKeys';
 import { dashboardService } from '../services/apiService';
-import type { Permission } from '../types/auth';
-
-export interface ModuleCardConfig {
-  permission: Permission;
-  title: string;
-  grantedText: string;
-  deniedText: string;
-  to: string;
-}
-
-export const RBAC_MODULES: readonly ModuleCardConfig[] = [
-  {
-    permission: 'projects:write',
-    title: 'Project Delivery',
-    grantedText: 'Create initiatives, update tasks, and manage milestone tracks.',
-    deniedText: 'Requires projects:write permission (Admin or Manager).',
-    to: '/projects',
-  },
-  {
-    permission: 'users:write',
-    title: 'User Administration',
-    grantedText: 'Invite members, update role tiers, and manage account status.',
-    deniedText: 'Requires users:write permission (Admin role).',
-    to: '/users',
-  },
-  {
-    permission: 'audit:read',
-    title: 'Security Audit Logs',
-    grantedText: 'Inspect live sign-ins, token sessions, and activity trails.',
-    deniedText: 'Requires audit:read permission (Admin or Manager).',
-    to: '/audit',
-  },
-  {
-    permission: 'settings:manage',
-    title: 'System Security Settings',
-    grantedText: 'Configure authentication lifecycle and workspace policy.',
-    deniedText: 'Requires settings:manage permission (Admin role).',
-    to: '/settings',
-  },
-];
 
 export function useDashboardOverview() {
   const toast = useToast();
-  const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, error, isFetching, refetch } = useQuery({
-    queryKey: queryKeys.dashboard,
-    queryFn: ({ signal }) => dashboardService.getOverview(signal),
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.dashboard.summary,
+    queryFn: ({ signal }) => dashboardService.getSummary(signal),
   });
 
+  const trackProgressQuery = useQuery({
+    queryKey: queryKeys.dashboard.trackProgress,
+    queryFn: ({ signal }) => dashboardService.getTrackProgress(signal),
+  });
+
+  const statusBreakdownQuery = useQuery({
+    queryKey: queryKeys.dashboard.statusBreakdown,
+    queryFn: ({ signal }) => dashboardService.getStatusBreakdown(signal),
+  });
+
+  const employeeStatusQuery = useQuery({
+    queryKey: queryKeys.dashboard.employeeStatus,
+    queryFn: ({ signal }) => dashboardService.getEmployeeStatus(signal),
+  });
+
+  const activityTrendQuery = useQuery({
+    queryKey: queryKeys.dashboard.activityTrend,
+    queryFn: ({ signal }) => dashboardService.getActivityTrend(signal),
+  });
+
+  const refreshing =
+    summaryQuery.isFetching ||
+    trackProgressQuery.isFetching ||
+    statusBreakdownQuery.isFetching ||
+    employeeStatusQuery.isFetching ||
+    activityTrendQuery.isFetching;
+
   const handleRefresh = useCallback(async () => {
-    const result = await refetch();
-    if (result.error) {
-      toast.error(getErrorMessage(result.error, 'Unable to refresh overview.'));
+    const results = await Promise.all([
+      summaryQuery.refetch(),
+      trackProgressQuery.refetch(),
+      statusBreakdownQuery.refetch(),
+      employeeStatusQuery.refetch(),
+      activityTrendQuery.refetch(),
+    ]);
+    const failed = results.find((res) => res.error);
+    if (failed?.error) {
+      toast.error(getErrorMessage(failed.error, 'Some dashboard widgets failed to refresh.'));
       return;
     }
     toast.info('Dashboard metrics refreshed.');
-  }, [refetch, toast]);
+  }, [
+    activityTrendQuery,
+    employeeStatusQuery,
+    statusBreakdownQuery,
+    summaryQuery,
+    toast,
+    trackProgressQuery,
+  ]);
 
-  const filteredModules = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return RBAC_MODULES;
-    return RBAC_MODULES.filter(
-      (mod) =>
-        mod.title.toLowerCase().includes(query) ||
-        mod.permission.toLowerCase().includes(query) ||
-        mod.grantedText.toLowerCase().includes(query),
-    );
-  }, [searchQuery]);
-
-  const overview = data ?? null;
-  const totalProjects = overview?.stats.totalProjects ?? 0;
-  const activeProjects = overview?.stats.activeProjects ?? 0;
-  const totalTasks = overview?.stats.totalTasks ?? 0;
-  const completedTasks = overview?.stats.completedTasks ?? 0;
-  const totalUsers = overview?.stats.totalUsers ?? 0;
-  const taskRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const summary = summaryQuery.data ?? null;
 
   return {
-    overview,
-    refreshing: isFetching,
-    error: error ? getErrorMessage(error, 'Unable to load overview') : null,
-    searchQuery,
-    setSearchQuery,
-    filteredModules,
-    metrics: {
-      totalProjects,
-      activeProjects,
-      totalTasks,
-      completedTasks,
-      totalUsers,
-      taskRate,
+    summary,
+    summaryLoading: summaryQuery.isPending,
+    summaryRefreshing: summaryQuery.isFetching,
+    summaryError: summaryQuery.error
+      ? getErrorMessage(summaryQuery.error, 'Unable to load workspace summary.')
+      : null,
+    retrySummary: () => {
+      void summaryQuery.refetch();
     },
+
+    trackProgress: {
+      data: trackProgressQuery.data ?? null,
+      loading: trackProgressQuery.isPending,
+      retrying: trackProgressQuery.isFetching,
+      error: trackProgressQuery.error
+        ? getErrorMessage(trackProgressQuery.error, 'Unable to load track progress.')
+        : null,
+      onRetry: () => {
+        void trackProgressQuery.refetch();
+      },
+    },
+
+    statusBreakdown: {
+      data: statusBreakdownQuery.data ?? null,
+      loading: statusBreakdownQuery.isPending,
+      retrying: statusBreakdownQuery.isFetching,
+      error: statusBreakdownQuery.error
+        ? getErrorMessage(statusBreakdownQuery.error, 'Unable to load project status.')
+        : null,
+      onRetry: () => {
+        void statusBreakdownQuery.refetch();
+      },
+    },
+
+    employeeStatus: {
+      data: employeeStatusQuery.data ?? null,
+      loading: employeeStatusQuery.isPending,
+      retrying: employeeStatusQuery.isFetching,
+      error: employeeStatusQuery.error
+        ? getErrorMessage(employeeStatusQuery.error, 'Unable to load employee status.')
+        : null,
+      onRetry: () => {
+        void employeeStatusQuery.refetch();
+      },
+    },
+
+    activityTrend: {
+      data: activityTrendQuery.data ?? null,
+      loading: activityTrendQuery.isPending,
+      retrying: activityTrendQuery.isFetching,
+      error: activityTrendQuery.error
+        ? getErrorMessage(activityTrendQuery.error, 'Unable to load activity trend.')
+        : null,
+      onRetry: () => {
+        void activityTrendQuery.refetch();
+      },
+    },
+
+    refreshing,
     handleRefresh,
   };
 }
