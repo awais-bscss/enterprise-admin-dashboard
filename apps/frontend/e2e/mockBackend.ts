@@ -231,6 +231,7 @@ export async function installMockBackend(
     };
   };
 
+  await page.unroute('**/api/**');
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());

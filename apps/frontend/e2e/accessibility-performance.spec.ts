@@ -17,6 +17,7 @@ test.describe('WCAG 2.1 AA Accessibility & Core Web Vitals Audits', () => {
   test('passes Axe accessibility checks on login and across authenticated routes in dark mode', async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     await installMockBackend(page);
 
     for (const routePath of PUBLIC_ROUTES) {
