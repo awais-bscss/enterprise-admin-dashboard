@@ -122,7 +122,7 @@ async function normalizeAxiosError(error: AxiosError): Promise<ApiError> {
   return new ApiError(`Request failed (${status})`, status, 'REQUEST_FAILED');
 }
 
-// Coalesce concurrent refresh calls so rotated refresh tokens are never replayed.
+// Reuse one in-flight refresh call if multiple requests hit 401 at the same time.
 export async function refreshSession(): Promise<AuthSessionData | null> {
   if (sessionRefreshInFlight) {
     return sessionRefreshInFlight;

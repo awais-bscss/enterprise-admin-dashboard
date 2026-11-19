@@ -5,7 +5,7 @@ import { setAccessToken, setSessionExpiredHandler } from '../lib/api';
 import { queryClient } from '../lib/queryClient';
 import { server } from './mswServer';
 
-// Prevent background chunk preloading from importing unrelated heavy routes during test teardown.
+// Skip background route preloading during unit tests.
 vi.mock('../app/routePreload', () => ({
   loadDashboardPage: vi.fn(),
   loadDashboardChartsGrid: vi.fn(),

@@ -37,10 +37,7 @@ export function resolvePaginationWindow(
   };
 }
 
-/**
- * Fetches a paginated slice, running page 1's item query alongside the count in
- * parallel because skip is guaranteed to be 0 before clamping.
- */
+// Run page 1 query and total count in parallel since skip is always 0.
 export async function resolvePaginatedItems<T>(
   requestedPage: number,
   limit: number,

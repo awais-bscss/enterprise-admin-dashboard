@@ -6,10 +6,7 @@ interface CookieStoreApi {
   get: (name: string) => Promise<CookieStoreMatch | null>;
 }
 
-/**
- * Reads a cookie asynchronously via the Cookie Store API when available so
- * Chromium does not emit synchronous `document.cookie` performance issues.
- */
+// Use async cookieStore when supported to avoid synchronous document.cookie warnings.
 export async function getCookieAsync(name: string): Promise<string | null> {
   if (typeof window !== 'undefined' && 'cookieStore' in window) {
     try {

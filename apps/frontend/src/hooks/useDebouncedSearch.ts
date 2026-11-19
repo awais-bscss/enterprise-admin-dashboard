@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-/**
- * Keeps an immediate controlled input value in sync with debounced URL/query updates.
- */
+// Syncs the text input state with a debounced search callback.
 export function useDebouncedSearch(
   committedValue: string,
   onCommit: (nextValue: string) => void,

@@ -35,9 +35,7 @@ interface EntityDirectoryConfig<
   removeFn: (id: string) => Promise<string>;
 }
 
-/**
- * Shared paginated CRUD directory hook for active/inactive entity workspaces.
- */
+// Shared state and query hook for paginated directory workspaces.
 export function useEntityDirectory<
   TItem extends { id: string; name: string; status: EntityStatus },
   TResponse extends { stats: EntityStatusStats; pagination: PaginationMeta },

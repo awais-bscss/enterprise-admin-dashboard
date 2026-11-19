@@ -72,7 +72,7 @@ export function setAuthCookies(res: Response, refreshToken: string, csrfToken: s
     maxAge: REFRESH_TOKEN_TTL_MS,
   });
 
-  // Readable by same-origin client code for double-submit CSRF verification.
+  // Frontend reads this cookie and sends it back in the x-csrf-token header.
   res.cookie(CSRF_COOKIE_NAME, csrfToken, {
     httpOnly: false,
     sameSite: "lax",

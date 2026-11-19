@@ -28,7 +28,7 @@ export async function connectToDatabase(): Promise<boolean> {
 
   if (readyState === 0 || readyState === 3) {
     cache.conn = null;
-    // Clear any resolved promise from an earlier connection so disconnects trigger a fresh dial.
+    // Reset stale promise after a disconnect so the next call reconnects.
     cache.promise = null;
   }
 

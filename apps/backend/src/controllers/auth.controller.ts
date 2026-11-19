@@ -146,7 +146,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // Revoke entire token family if a rotated token is replayed.
+  // Old refresh token reused; revoke active tokens in this family.
   if (existing.revokedAt) {
     await RefreshToken.updateMany(
       { familyId: existing.familyId, revokedAt: null },

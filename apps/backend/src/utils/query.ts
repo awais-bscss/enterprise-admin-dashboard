@@ -4,9 +4,7 @@ export function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/**
- * Computes total, active, and inactive document counts in one aggregation pass.
- */
+// Count active and inactive documents in one DB query.
 export async function summarizeActiveStatus(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model: Model<any>,
