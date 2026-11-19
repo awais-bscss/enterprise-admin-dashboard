@@ -1,6 +1,6 @@
 # Config (`src/config`)
 
-Core configuration files loaded by the Express server and seed script.
+Core configuration files loaded by the Express server.
 
 ## Files
 

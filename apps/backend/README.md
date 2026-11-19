@@ -23,8 +23,7 @@ apps/backend/
 │   ├── routes/        # API routes (/api/*) -> see src/routes/README.md
 │   ├── utils/         # Tokens, pagination, query & domain helpers -> see src/utils/README.md
 │   ├── app.ts         # Express app setup (middleware + /api routes)
-│   ├── server.ts      # Local HTTP server entry point
-│   └── seed.ts        # Database seed script for roles & sample records
+│   └── server.ts      # Local HTTP server entry point
 ├── tests/             # Backend helper unit tests -> see tests/README.md
 ├── .env.example       # Sample environment variables
 ├── vercel.json        # Serverless deployment configuration
@@ -78,7 +77,6 @@ Start from `apps/backend/.env.example`:
 - `JWT_REFRESH_SECRET` — secret for auth/refresh handling
 - `FRONTEND_URL` — allowed frontend origin for CORS (e.g. `http://localhost:5173`)
 - `CSRF_SECRET` — HMAC secret for signing CSRF tokens (falls back to `JWT_REFRESH_SECRET` if unset)
-- `SEED_ADMIN_*`, `SEED_MANAGER_*`, `SEED_VIEWER_*` — email/password values used when running `npm run seed`
 
 ## Scripts
 
@@ -89,5 +87,4 @@ npm run dev        # Start local server in watch mode (tsx watch src/server.ts)
 npm run typecheck  # Type-check without emitting files
 npm run compile    # Build JavaScript output with tsc
 npm run test       # Run helper unit tests in tests/
-npm run seed       # Seed initial database records
 ```

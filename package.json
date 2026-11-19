@@ -2,7 +2,6 @@
   "name": "enterprise-admin-dashboard",
   "private": true,
   "scripts": {
-    "dev": "node scripts/dev.mjs",
     "install:frontend": "npm install --prefix apps/frontend",
     "install:backend": "npm install --prefix apps/backend",
     "dev:frontend": "npm --prefix apps/frontend run dev",
@@ -12,20 +11,7 @@
     "test:backend": "npm --prefix apps/backend run test",
     "test:frontend": "npm --prefix apps/frontend run test",
     "test:e2e": "npm --prefix apps/frontend run test:e2e",
-    "test:exercise": "npm --prefix exercises/structured-output-adapter test",
     "compile:backend": "npm --prefix apps/backend run compile",
-    "typecheck:backend": "npm --prefix apps/backend run typecheck",
-    "seed:backend": "npm --prefix apps/backend run seed",
-    "install:web": "npm run install:frontend",
-    "install:api": "npm run install:backend",
-    "dev:web": "npm run dev:frontend",
-    "dev:api": "npm run dev:backend",
-    "build:web": "npm run build:frontend",
-    "lint:web": "npm run lint:frontend",
-    "test:api": "npm run test:backend",
-    "test:web": "npm run test:frontend",
-    "compile:api": "npm run compile:backend",
-    "typecheck:api": "npm run typecheck:backend",
-    "seed:api": "npm run seed:backend"
+    "typecheck:backend": "npm --prefix apps/backend run typecheck"
   }
 }

@@ -7,14 +7,10 @@ A full-stack admin workspace for managing projects, departments, clients, employ
 ```text
 .
 ├── apps/
-│   ├── frontend/                 # React + TypeScript + Vite dashboard app
-│   └── backend/                  # Express + TypeScript + MongoDB API server
-├── docs/                         # Simple architecture, security, test, and audit notes
-├── exercises/
-│   └── structured-output-adapter/ # Standalone TypeScript adapter & Vitest exercise
-├── scripts/
-│   └── dev.mjs                   # Starts backend and frontend together in dev mode
-└── package.json                  # Root workspace scripts
+│   ├── frontend/    # React + TypeScript + Vite dashboard app
+│   └── backend/     # Express + TypeScript + MongoDB API server
+├── docs/            # Architecture, security, test, and audit notes
+└── package.json     # Root workspace scripts
 ```
 
 ## App & Folder Guides
@@ -25,7 +21,6 @@ A full-stack admin workspace for managing projects, departments, clients, employ
   - Shared UI components: [apps/frontend/src/components/README.md](apps/frontend/src/components/README.md)
   - Client & utility helpers: [apps/frontend/src/lib/README.md](apps/frontend/src/lib/README.md)
 - Backend guide: [apps/backend/README.md](apps/backend/README.md)
-- Standalone exercise: [exercises/structured-output-adapter/README.md](exercises/structured-output-adapter/README.md)
 
 ## Quick Start (Local Development)
 
@@ -39,7 +34,7 @@ npm run install:frontend
 
 ### 2. Configure environment files
 
-Copy the example env files and fill in your local values (MongoDB connection string, JWT secrets, and seed credentials):
+Copy the example env files and fill in your local values (MongoDB connection string and JWT secrets):
 
 ```bash
 cp apps/backend/.env.example apps/backend/.env
@@ -49,29 +44,26 @@ cp apps/frontend/.env.example apps/frontend/.env.development
 - Backend variables are documented in [apps/backend/README.md](apps/backend/README.md).
 - Frontend variables are documented in [apps/frontend/README.md](apps/frontend/README.md).
 
-### 3. Seed demo users and workspace data (first run)
+### 3. Run backend and frontend locally
+
+Run each service from the root folder in separate terminals:
 
 ```bash
-npm run seed:backend
+# Terminal 1 (Backend on http://localhost:4000)
+npm run dev:backend
+
+# Terminal 2 (Frontend on http://localhost:5173)
+npm run dev:frontend
 ```
 
-### 4. Start both apps together
-
-```bash
-npm run dev
-```
-
-- Frontend runs on `http://localhost:5173`
-- Backend runs on `http://localhost:4000`
-- During local development, Vite proxies `/api/*` requests from `:5173` to `:4000` so login and refresh cookies stay on the same origin.
+During local development, Vite proxies `/api/*` requests from `:5173` to `:4000` so login and refresh cookies stay on the same origin.
 
 ## Common Root Scripts
 
 | Script | Purpose |
 | --- | --- |
-| `npm run dev` | Run backend and frontend together |
-| `npm run dev:backend` | Run backend only (`tsx watch`) |
-| `npm run dev:frontend` | Run frontend only (`vite`) |
+| `npm run dev:backend` | Run backend server (`tsx watch`) |
+| `npm run dev:frontend` | Run frontend server (`vite`) |
 | `npm run build:frontend` | Type-check and build frontend (`apps/frontend/dist`) |
 | `npm run lint:frontend` | Run `oxlint` on frontend code |
 | `npm run typecheck:backend` | Type-check backend TypeScript |
@@ -79,10 +71,6 @@ npm run dev
 | `npm run test:backend` | Run Node built-in unit tests for backend helpers |
 | `npm run test:frontend` | Run Vitest unit & integration tests for frontend |
 | `npm run test:e2e` | Run Playwright end-to-end & accessibility tests |
-| `npm run test:exercise` | Run Vitest suite for the standalone exercise |
-| `npm run seed:backend` | Seed sample data into MongoDB |
-
-> Existing `:api` and `:web` aliases (`dev:api`, `dev:web`, etc.) are also kept in [package.json](package.json) so older scripts continue to work.
 
 ## Documentation Index
 

@@ -2,7 +2,7 @@
 
 A plain-English guide to how this project is tested, what each test layer covers, and how to run every check.
 
-## Overview of Automated Tests (64 Total)
+## Overview of Automated Tests (60 Total)
 
 | Layer | Location | Tool | Count | What It Checks |
 | --- | --- | --- | --- | --- |
@@ -10,7 +10,6 @@ A plain-English guide to how this project is tested, what each test layer covers
 | Frontend Unit | `apps/frontend/src/lib/`, `features/auth/`, `workers/` | Vitest | **20 tests (6 files)** | Route access checks, `api.ts` retry/refresh behavior, async cookies, date/name formatters, form validators, CSV/JSON export safety |
 | Frontend Integration | `apps/frontend/src/features/` | Vitest + React Testing Library + MSW | **24 tests (5 files)** | Login flow, route guards, Dashboard cards/charts/retry, Projects filters/creation/URL sync/searchable multi-page options, Departments/Clients/Employees drill-downs |
 | Browser E2E & A11y | `apps/frontend/e2e/` | Playwright + `@axe-core/playwright` | **3 tests (2 files)** | Redirects, wrong-password alert, project creation, logout, viewer RBAC blocks, WCAG 2.1 AA checks across routes, Core Web Vitals & lazy chunks |
-| Standalone Exercise | `exercises/structured-output-adapter/` | Node `node --test` | **4 tests (1 file)** | Runtime validation, fallback handling, and memoized selector behavior |
 
 ## Running All Checks
 
@@ -26,9 +25,6 @@ npm --prefix apps/frontend run typecheck:tests
 npm run test:frontend
 npm run build:frontend
 npm run test:e2e
-
-# Exercise tests
-npm run test:exercise
 ```
 
 ## Detailed Coverage Notes
@@ -46,4 +42,4 @@ npm run test:exercise
 ## Honest Boundaries (What Is Mocked vs Live)
 
 - Frontend integration tests use MSW, and Playwright E2E tests use `apps/frontend/e2e/mockBackend.ts` against `npm run preview`. They do not spin up MongoDB during test runs.
-- Full end-to-end persistence against a live MongoDB database is covered when running the full app locally (`npm run seed:backend` + `npm run dev`) or in the deployed environment.
+- Full end-to-end persistence against a live MongoDB database is verified when running both local apps (`npm run dev:backend` + `npm run dev:frontend`) or in the deployed environment.

@@ -9,7 +9,6 @@
     "compile": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"tests/**/*.test.ts\"",
-    "seed": "tsx src/seed.ts",
     "start": "node dist/src/server.js"
   },
   "dependencies": {

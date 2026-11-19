@@ -1,8 +1,0 @@
-{
-  "name": "structured-output-adapter-exercise",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --test adapter.test.ts"
-  }
-}
